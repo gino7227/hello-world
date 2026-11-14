@@ -1,0 +1,67 @@
+?TACL MACRO
+== ==================================================================
+== CWATCH - "C" betuvel kezdodo uj fajlok figyelese egy subvolume-ban
+==
+== Hasznalat (a fajl betoltese utan):
+==   LOAD /KEEP 1/ $DATA.TACLLIB.CWATCH
+==   CWATCH <subvol> <masodperc> <parancs ...>
+==
+== Pelda:
+==   CWATCH $DATA.INBOX 10 CHANDLR
+==     -> 10 masodpercenkent megnezi a $DATA.INBOX.C* fajlokat, es minden
+==        UJ talalatra lefuttatja:  CHANDLR \node.$DATA.INBOX.Cxxxx
+==
+== Mukodes:
+==  - A TACL-ben nincs fajlrendszer-esemeny, ezert a makro pollingol:
+==    #FILENAMES-szel listazza a <subvol>.C* fajlokat, es osszeveti az
+==    elozo korben latott listaval.
+==  - Az inditaskor mar letezo C* fajlokra NEM fut le a parancs (alapallapot).
+==  - Ha egy fajlt torolnek, majd ujra letrehoznak, ujra jelez.
+==  - A parancs utolso argumentumkent megkapja az uj fajl teljes nevet.
+==  - Leallitas: BREAK, vagy hozz letre egy <subvol>.STOPCW fajlt
+==    (pl. FUP CREATE $DATA.INBOX.STOPCW). A STOPCW nem C-vel kezdodik,
+==    ezert nem valt ki parancsot.
+==
+== Megjegyzes: osszetett (vesszot tartalmazo) parancs helyett irj egy
+== kulon kezelo makrot (lasd CHANDLR), es annak a nevet add meg.
+== ==================================================================
+?SECTION cwatch MACRO
+#FRAME
+#PUSH cw^tmpl cw^stop cw^cs cw^old cw^new cw^rest cw^f cw^fn cw^first
+#SET cw^tmpl %1%.C*
+#SET cw^stop %1%.STOPCW
+#SET cw^cs [#COMPUTE %2% * 100]   == #DELAY szazadmasodpercben var
+#SET cw^old .
+#SET cw^first -1
+
+#OUTPUT CWATCH: figyelem: [cw^tmpl]  (leallitas: BREAK vagy [cw^stop])
+
+[#LOOP |WHILE| NOT [#FILEINFO /EXISTENCE/ [cw^stop]] |DO|
+  == Az aktualis C* fajlok listaja ".NEV1.NEV2." alakban
+  #SET cw^new .
+  #SET cw^rest [#FILENAMES [cw^tmpl]]
+  [#LOOP |WHILE| NOT [#EMPTYV cw^rest] |DO|
+    #SET cw^rest [#SETMANY cw^f , [cw^rest]]
+    #SET cw^fn [#FILEINFO /FILE/ [cw^f]]
+    #SET cw^new [cw^new][cw^fn].
+
+    == Uj fajl: az elozo korben nem szerepelt (es nem az elso kor)
+    [#IF NOT [cw^first] AND ( [#CHARFIND cw^old 1 .[cw^fn].] = 0 ) |THEN|
+      #OUTPUT CWATCH: uj fajl: [cw^f]
+      %3 TO *% [cw^f]
+    ]
+  ]
+  #SET cw^old [cw^new]
+  #SET cw^first 0
+  #DELAY [cw^cs]
+]
+
+#OUTPUT CWATCH: leallitva ([cw^stop] letezik).
+#UNFRAME
+
+?SECTION chandlr MACRO
+== Pelda kezelo: kiirja a fajl adatait, majd athelyezi egy feldolgozo
+== subvolume-ba. Ird at a sajat igenyeid szerint.
+#OUTPUT CHANDLR: feldolgozom: %1%
+FUP INFO %1%, DETAIL
+== FUP RENAME %1%, $DATA.DONE.*
