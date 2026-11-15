@@ -1,0 +1,8 @@
+# PTLFRPT valaszkod-megnevezesek
+# Formatum: soronkent "nnn megnevezes" (nnn = AUTH.RESP-CDE, 3 jegy)
+# A kodokat a BASE24-pos Transaction Processing Manual alapjan toltsd ki.
+# Csak ASCII karaktert hasznalj (ekezet nelkul). Max. 29 karakter jelenik meg.
+#
+# Pelda (a kodok csak mintak, ellenorizd a sajat listatokkal!):
+# 000 Engedelyezve
+# 051 Fedezethiany
