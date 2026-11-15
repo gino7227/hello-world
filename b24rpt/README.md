@@ -1,95 +1,55 @@
-# PTLFRPT – BASE24-pos PTLF napi riport
+# BASE24 napi riportok (HP NonStop, C)
 
-C program HP NonStop (Guardian) rendszerre. A napi PTLF fájlt (`POyymmdd`) egyszer
-olvassa végig, és négy riportot készít belőle:
+Két önálló C program Guardian alá:
 
-1. **Napi összesítő** – tranzakciótípusonként (engedélyezett, elutasított), belföld/külföld,
-   döntés helye (host, BASE24, STIP, Host Interface, hálózat), összegek devizánként, kivétel-rekordok.
-2. **Válaszkód-elemzés** – elutasító és engedélyező kódok, döntés helye szerinti bontásban.
-3. **Óránkénti forgalom** – darab, elutasítási arány, STIP, időtúllépéses sztornó,
-   host válaszidő (átlag, p95), csúcsóra/-perc/-másodperc, STIP-időszakok.
-4. **Melléklet: országok** – `TERM-CNTRY-CDE` szerint.
+| Program | Bemenet | Riportok |
+|---|---|---|
+| `ptlfrpt.c` | BASE24-pos PTLF (`POyymmdd`) | napi összesítő, válaszkód-elemzés, óránkénti forgalom, országlista |
+| `tlfrpt.c` | BASE24-atm TLF (`TLyymmdd`) | napi összesítő, válaszkód-elemzés, óránkénti forgalom, ATM-enkénti forgalom, sztornóokok |
 
-A kimenet ékezet nélküli ASCII, hogy spooleren is olvasható legyen.
-Kártyaadatot (PAN, TRACK2, lejárat, számlaszám) a program **nem** ír ki.
+A kimenet ékezet nélküli ASCII, legfeljebb 79 oszlop: terminálon és spoolerben is olvasható.
+Kártyaszámot, Track 2-t, lejáratot, számlaszámot és egyenleget egyik program sem ír ki.
 
-## Fordítás NonStopon
-1. Töltsd fel a `ptlfrpt.c` fájlt EDIT fájlként (pl. `$DATA.B24RPT.PTLFRPTC`),
-   ugyanúgy, ahogy az előző C programot.
-2. Fordítsd le ugyanazzal a fordítóval és opciókkal, mint az előzőt. Például:
-   `CCOMP /IN PTLFRPTC/ PTLFRPT; RUNNABLE, SYSTYPE GUARDIAN`
-   Itaniumon (TNS/E) a fordító neve `CCOMP`, x86-on (TNS/X) szintén `CCOMP`; ha nálatok
-   más a megszokott parancs (pl. külön `ELD`/`XLD` linkelés), azt használd.
-
-A program Guardian alatt a `FILE_OPEN_` / `READX` eljárásokkal olvassa az entry-sequenced
-PTLF-et, és a `CONVERTTIMESTAMP` segítségével a rendszer helyi idejére vált.
+## Fordítás
+Töltsd fel a forrást EDIT fájlként, és fordítsd le ugyanúgy, mint eddig, pl.:
+```
+CCOMP /IN PTLFRPTC/ PTLFRPT; RUNNABLE, SYSTYPE GUARDIAN
+CCOMP /IN TLFRPTC/  TLFRPT;  RUNNABLE, SYSTYPE GUARDIAN
+```
 
 ## Futtatás
 ```
-RUN PTLFRPT /OUT $S.#PTLFRPT/ $DATA.PTLF.PO261114
+RUN PTLFRPT /OUT $S.#PTLFRPT/ $vol.subvol.POyymmdd
+RUN TLFRPT  /OUT $S.#TLFRPT/  $vol.subvol.TLyymmdd
+```
+Egyetlen opció a `-d n` (diagnosztika): az első *n* tranzakció mezőit írja ki, majd kilép.
+Új fájlnál vagy BASE24-verzióváltás után érdemes vele ellenőrizni, hogy a mezők jó helyről jönnek-e:
+```
+RUN PTLFRPT -d 5 $vol.subvol.POyymmdd
 ```
 
-| Opció | Jelentés |
-|---|---|
-| `-a nnn` | Az első **elutasító** válaszkód (alap: `050`); ennél kisebb = engedélyezett |
-| `-c XX` | Hazai országkód a belföld/külföld bontáshoz (alap: `HU`) |
-| `-r fájl` | Válaszkód-megnevezések felülírása. A BASE24-pos kódok be vannak építve, ez csak eltéréshez kell. |
-| `-h dest` | A saját host `DEST` neve (pl. `BICI`), ha a host interchange interfészen át kapcsolódik: `RESPONDER` 6/7 és ez a `DEST` → Host |
-| `-z perc` | Időeltolás GMT-hez képest percben (alap: a rendszer helyi ideje) |
-| `-d n` | Diagnosztika: az első *n* tranzakció mezőinek kiírása (kártyaadat nélkül) |
+## Beépített beállítások
+- **Idő:** a rendszer helyi ideje (`HEAD.DAT-TIM`, GMT → helyi idő a `CONVERTTIMESTAMP`-pal).
+- **Belföld:** `HU` (`AUTH.TERM-CNTRY-CDE`), csak a PTLF riportban.
+- **Engedélyezett válaszkód:** POS `000–049`; ATM ok-kód `00–49` és `90–92` (a válaszkód első jegye
+  `1` = elnyelt kártya).
+- **Válaszkód-megnevezések:** a BASE24-pos és BASE24-atm kódok a programokba vannak építve.
+  A `respdesc.txt` és az `atmresp.txt` csak a forrásuk.
+- **Döntés helye:** `RESPONDER` 5 = host, 3 = BASE24 (ha `RTE-STAT` ≠ 00: STIP), 4 = Host Interface,
+  6/7 = interchange.
 
-### Első futtatás: ellenőrzés
-Először futtasd `-d 5` opcióval, és nézd meg, hogy a mezők értelmesek-e:
-`REC-TYP=01`, `TYP=0210`, `TC=10`, `RESP=000`, `DAT-TIM` mai dátum, `CRNCY=348` stb.
-Ha valami elcsúszott, a DDL eltérhet a Release 6.0-tól; ilyenkor küldd el a kimenetet.
-
-## Feltételezések (ellenőrizendő)
-- **Engedélyezés:** `RESP-CDE < 050` → engedélyezett. A `-a` opcióval módosítható.
-- **Döntés helye:** `RESPONDER` 5 = host, 3 = BASE24 (ha `RTE-STAT` ≠ 00, akkor STIP),
-  4 = Host Interface, 6/7 = hálózat.
-- **Nettó:** vásárlás + lezárás + MOTO + készpénz + cashback − visszatérítés − sztornó
-  (`AMT-1`, a tranzakció devizájában). Az előengedélyezés külön oszlopban.
-- **Időpont:** `HEAD.DAT-TIM` (rendszeridő), nem a terminál helyi ideje.
-- **Válaszidő:** `RE-ENTRY-TIM − EXIT-TIM` (a host válaszideje a Host Interface szerint).
-- A mezőpozíciók a BASE24-pos Release 6.0 DDL-jéből számolva: HEAD 172, AUTH 614 bájt.
-
-## Válaszkód-fájlok
-- `respdesc.txt` – BASE24-pos (PTLF) válaszkódok. Ezek be vannak építve a programba; a fájl csak forrás/minta a `-r` felülíráshoz.
-- `atmresp.txt` – BASE24-atm (TLF) válaszkódok a későbbi ATM riporthoz.
+## Feltételezések
+- PTLF nettó: vásárlás + lezárás + MOTO + készpénz + cashback − visszatérítés − sztornó
+  (`AMT-1`, a tranzakció devizájában). Az előengedélyezés külön.
+- TLF nettó kifizetés: engedélyezett felvét − sztornózott (0420: `AMT-1 − AMT-2`) + korrekció
+  (5400: `AMT-2 − AMT-1`). Saját kártya: `CRD.FIID` = `TERM.FIID`.
+- Mezőpozíciók: BASE24 Release 6.0 DDL. PTLF: HEAD 172 + AUTH 614 bájt; TLF: HEAD 76 + AUTH 398 bájt.
 
 ## Teszt (nem NonStop gépen)
 ```
-python3 test/gen_ptlf.py /tmp/po.dat          # szintetikus PTLF, kártyaszám nélkül
-gcc -std=c89 -Wall -o /tmp/ptlfrpt ptlfrpt.c
-/tmp/ptlfrpt -z 60 -r respdesc.txt /tmp/po.dat
+python3 test/gen_ptlf.py /tmp/po.dat; python3 test/gen_tlf.py /tmp/tl.dat
+gcc -std=c89 -Wall -o /tmp/ptlfrpt ptlfrpt.c; gcc -std=c89 -Wall -o /tmp/tlfrpt tlfrpt.c
+TZ=Europe/Budapest /tmp/ptlfrpt /tmp/po.dat
+TZ=Europe/Budapest /tmp/tlfrpt /tmp/tl.dat
 ```
-
----
-
-# TLFRPT – BASE24-atm TLF napi riport
-
-Ugyanígy működik, mint a PTLFRPT, a napi ATM tranzakciós naplóra (`TLyymmdd`).
-
-1. **Napi összesítő** – tranzakciótípus, üzenettípus (0210/0220/0420/5400), saját/idegen kártya,
-   kártyahálózat (`CRD.LN`), döntés helye, elnyelt kártyák, nettó kifizetés devizánként.
-2. **Válaszkód-elemzés** – a BASE24-atm kódok be vannak építve (`1xx` = elnyelt kártya).
-3. **Óránkénti forgalom** – STIP, időtúllépés, ATM/kapcsolati hiba, host válaszidő.
-4. **ATM-enkénti forgalom** – figyelendő ATM-ek (sok hiba, elnyelt kártya, magas elutasítás,
-   elhallgatott ATM), majd minden ATM: darab, elutasítás, felvét, kifizetett összeg,
-   kazettaműveletek, utolsó tranzakció ideje.
-5. **Melléklet** – sztornó (0420) és korrekció (5400) okok.
-
-```
-RUN TLFRPT -d 5 $DATA.TLF.TL261114                 == diagnosztika
-RUN TLFRPT /OUT $S.#TLFRPT/ $DATA.TLF.TL261114     == riport
-```
-
-Opciók: `-a nn` (első elutasító ok-kód, alap 50; a 90–92 mindig engedélyezett),
-`-r fájl` (megnevezések felülírása), `-z perc`, `-d n`.
-A diagnosztika és a riport sem ír ki kártyaszámot, számlaszámot vagy egyenleget.
-
-Feltételezések: saját kártya = `CRD.FIID` = `TERM.FIID`; nettó kifizetés = engedélyezett
-felvét − sztornózott (0420: `AMT-1 − AMT-2`) + korrekció (5400: `AMT-2 − AMT-1`).
-Mezőpozíciók: BASE24-atm Release 6.0 DDL, HEAD 76, AUTH 398 bájt.
-
-Teszt: `python3 test/gen_tlf.py /tmp/tl.dat && gcc -o /tmp/tlfrpt tlfrpt.c && /tmp/tlfrpt -z 60 /tmp/tl.dat`
+A tesztfájlok szintetikusak, valódi kártyaadat nincs bennük.

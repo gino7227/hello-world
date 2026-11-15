@@ -8,20 +8,11 @@
  *   4. Mellekletkent tranzakcios orszaglistat
  *
  * Hasznalat (Guardian):
- *   RUN PTLFRPT /OUT $S.#PTLFRPT/ [-a nnn] [-c HU] [-r respfile] [-z perc]
- *                                [-d n] $DATA.PTLF.PO261114
+ *   RUN PTLFRPT /OUT $S.#PTLFRPT/ $DATA.PTLF.PO261114
+ *   RUN PTLFRPT -d 5 $DATA.PTLF.PO261114      (diagnosztika)
  *
- *   -a nnn     elso ELUTASITO valaszkod (alap: 050; ennel kisebb = engedelyezett)
- *   -c XX      hazai orszagkod (alap: HU) a belfold/kulfold bontashoz
- *   -r fajl    valaszkod-megnevezesek felulirasa/kiegeszitese ("nnn szoveg"
- *              soronkent, # = megjegyzes). A BASE24-pos kodok be vannak
- *              epitve, ez az opcio csak eltereshez kell.
- *   -z perc    idoeltolas GMT-hez kepest percben (alap Guardianon: a rendszer
- *              helyi ideje; mashol: 0)
- *   -h nev     a sajat host DEST neve (pl. BICI), ha a host interchange
- *              interfeszen at kapcsolodik: RESPONDER 6/7 + ez a DEST = Host
- *   -d n       diagnosztika: az elso n tranzakcios rekord mezoinek kiirasa
- *              (kartyaszam, track2, lejarat es szamlaszam NELKUL), majd kilep
+ *   -d n   az elso n tranzakcios rekord mezoinek kiirasa
+ *          (kartyaadat nelkul), majd kilep
  *
  * A mezopoziciok a BASE24-pos Release 6.0 DDLFPTLF / DDLGDEFS alapjan:
  * HEAD = 172 bajt, AUTH = 614 bajt, minimalis rekordhossz 786 bajt.
@@ -75,6 +66,8 @@
 #define MIN_REC_LEN       786
 
 #define MAXREC            4096
+#define APPR_LIMIT        50     /* 000-049 = engedelyezett valaszkod */
+#define HOME_CNTRY        "HU"   /* belfold/kulfold bontas */
 #define RT_MAX_MS         5000   /* valaszido hisztogram felso hatara (ms) */
 #define MAX_CRNCY         64
 #define STIP_GAP          5      /* STIP-idoszakok osszevonasa (perc) */
@@ -103,14 +96,8 @@ static const char *dec_long[NDEC] = {
   "Host Interface", "Interchange (RESP. 6/7)", "Egyeb" };
 
 /* ---------- Opciok ---------- */
-static int  opt_appr_limit = 50;
-static char opt_home[3] = "HU";
-static const char *opt_respfile = NULL;
-static int  opt_tz_set = 0;
-static long opt_tz_min = 0;
 static int  opt_dump = 0;
 static const char *opt_file = NULL;
-static char opt_host[5] = "";       /* -h: sajat host DEST neve (pl. BICI) */
 
 /* ---------- Statisztikak ---------- */
 typedef struct { long cnt, appr; } CntAppr;
@@ -265,24 +252,22 @@ typedef struct { int y, mo, d, h, mi, s; } TmX;
 static int ts_local(long long jts, TmX *t)
 {
 #ifdef __TANDEM
-  if (!opt_tz_set) {
-    short dt[8];
-    long long l = CONVERTTIMESTAMP(jts, 0);  /* 0 = GMT -> helyi civil ido */
-    INTERPRETTIMESTAMP(l, dt);
-    t->y = dt[0]; t->mo = dt[1]; t->d = dt[2];
-    t->h = dt[3]; t->mi = dt[4]; t->s = dt[5];
-    return 0;
-  }
+  short dt[8];
+  long long l = CONVERTTIMESTAMP(jts, 0);  /* 0 = GMT -> helyi civil ido */
+  INTERPRETTIMESTAMP(l, dt);
+  t->y = dt[0]; t->mo = dt[1]; t->d = dt[2];
+  t->h = dt[3]; t->mi = dt[4]; t->s = dt[5];
+  return 0;
+#else
+  /* teszteleshez nem NonStop gepen: a TZ kornyezeti valtozo szerinti ido */
+  long long us = jts - JTS_UNIX_EPOCH;
+  time_t s = (time_t)(us / 1000000LL);
+  struct tm *g = localtime(&s);
+  if (!g) return -1;
+  t->y = g->tm_year + 1900; t->mo = g->tm_mon + 1; t->d = g->tm_mday;
+  t->h = g->tm_hour; t->mi = g->tm_min; t->s = g->tm_sec;
+  return 0;
 #endif
-  {
-    long long us = jts - JTS_UNIX_EPOCH;
-    time_t s = (time_t)(us / 1000000LL) + (time_t)opt_tz_min * 60;
-    struct tm *g = gmtime(&s);
-    if (!g) return -1;
-    t->y = g->tm_year + 1900; t->mo = g->tm_mon + 1; t->d = g->tm_mday;
-    t->h = g->tm_hour; t->mi = g->tm_min; t->s = g->tm_sec;
-    return 0;
-  }
 }
 
 static char *fmt_ts(long long jts, char *out)
@@ -337,7 +322,7 @@ static void rd_close(void) { if (rf) fclose(rf); }
 #endif
 
 /* ---------- Valaszkod-megnevezesek ---------- */
-/* Beepitett BASE24-pos valaszkod-megnevezesek (a -r fajl felulirhatja) */
+/* Beepitett BASE24-pos valaszkod-megnevezesek */
 static const struct { int code; const char *desc; } resp_builtin[] = {
   {  0, "Elfogadva, egyenleginformacioval"},
   {  1, "Elfogadva, egyenleginfo nelkul"},
@@ -469,24 +454,6 @@ static void load_builtin_resp(void)
     resp_desc[resp_builtin[i].code] = (char *)resp_builtin[i].desc;
 }
 
-static void load_resp(const char *fn)
-{
-  FILE *f = fopen(fn, "r"); char line[256];
-  if (!f) { fprintf(stderr, "Nem nyithato meg: %s (megnevezesek nelkul folytatom)\n", fn); return; }
-  while (fgets(line, sizeof line, f)) {
-    char *p = line, *e; long c;
-    while (*p == ' ') p++;
-    if (*p == '#' || *p == '\n' || *p == 0) continue;
-    c = strtol(p, &e, 10);
-    if (e == p || c < 0 || c > 999) continue;
-    while (*e == ' ' || *e == '\t') e++;
-    e[strcspn(e, "\r\n")] = 0;
-    resp_desc[c] = (char *)malloc(strlen(e) + 1);   /* felulirja a beepitettet */
-    if (resp_desc[c]) strcpy(resp_desc[c], e);
-  }
-  fclose(f);
-}
-
 /* ---------- Osztalyozas ---------- */
 static int classify(long typ, long tc)
 {
@@ -507,11 +474,7 @@ static int decision(const unsigned char *r)
   if (resp == '5') return D_HOST;
   if (resp == '3') return (rte > 0) ? D_STIP : D_B24;
   if (resp == '4') return D_HIF;
-  if (resp == '6' || resp == '7') {
-    /* ha a sajat host interchange interfeszen at kapcsolodik (-h) */
-    if (opt_host[0] && memcmp(r + OFF_DEST, opt_host, 4) == 0) return D_HOST;
-    return D_NET;
-  }
+  if (resp == '6' || resp == '7') return D_NET;
   return D_OTH;
 }
 
@@ -618,7 +581,7 @@ static void process(const unsigned char *r, int len)
   tc   = num(r + OFF_TC, 2);
   resp = num(r + OFF_RESP_CDE, 3);
   if (resp < 0) resp = 999;
-  appr = resp < opt_appr_limit;
+  appr = resp < APPR_LIMIT;
   ty = classify(typ, tc);
   dc = decision(r);
 
@@ -645,7 +608,7 @@ static void process(const unsigned char *r, int len)
   /* orszag */
   cc[0] = (char)r[OFF_TERM_CNTRY]; cc[1] = (char)r[OFF_TERM_CNTRY + 1]; cc[2] = 0;
   if (cc[0] == ' ' || cc[0] == 0) strcpy(cc, "??");
-  if (strcmp(cc, opt_home) == 0) { dom.cnt++; if (appr) dom.appr++; }
+  if (strcmp(cc, HOME_CNTRY) == 0) { dom.cnt++; if (appr) dom.appr++; }
   else                           { frn.cnt++; if (appr) frn.appr++; }
   if ((cn = get_cntry(cc)) != NULL) { cn->cnt++; if (!appr) cn->decl++; }
 
@@ -729,7 +692,7 @@ static void report_summary(void)
   printf("Kivetelek: 20 konyvelt %ld, 21 nem konyvelt %ld, 22 reszben %ld,\n",
          n_excp[0], n_excp[1], n_excp[2]);
   printf("           23 hibas adat %ld\n", n_excp[3]);
-  printf("Engedelyezett: valaszkod < %03d\n\n", opt_appr_limit);
+  printf("Engedelyezett: valaszkod < %03d\n\n", APPR_LIMIT);
 
   head_ca("Tipus");
   for (i = 0; i < NTYPE; i++) {
@@ -792,7 +755,7 @@ static void resp_table(int approved)
   for (k = 0; k < NDEC; k++) used[k] = 0;
   for (i = 0; i < 1000; i++) {
     long s = 0;
-    if ((i < opt_appr_limit) != approved) continue;
+    if ((i < APPR_LIMIT) != approved) continue;
     for (k = 0; k < NDEC; k++) { s += resp_cnt[i][k]; if (resp_cnt[i][k]) used[k] = 1; }
     if (!s) continue;
     g_sort_tot[i] = s; tot += s; idx[n++] = i;
@@ -834,10 +797,7 @@ static void report_resp(void)
   resp_table(0);
   printf("\nB) Engedelyezo valaszkodok\n");
   resp_table(1);
-  if (opt_host[0])
-    printf("\nDontes helye: Host   = RESPONDER 5, vagy 6/7 es DEST = %s\n", opt_host);
-  else
-    printf("\nDontes helye: Host   = RESPONDER 5\n");
+  printf("\nDontes helye: Host   = RESPONDER 5\n");
   printf("              BASE24 = RESPONDER 3 es RTE-STAT 00\n");
   printf("              STIP   = RESPONDER 3 es RTE-STAT <> 00\n");
   printf("              HostIF = RESPONDER 4,  ICHG = RESPONDER 6/7\n");
@@ -958,9 +918,7 @@ static void report_country(void)
 /* ---------- main ---------- */
 static void usage(void)
 {
-  fprintf(stderr, "Hasznalat: PTLFRPT [-a nnn] [-c XX] [-r respfile] [-z perc] [-h dest]\n"
-                  "                  [-d n]\n"
-                  "                  ptlf-fajl\n");
+  fprintf(stderr, "Hasznalat: PTLFRPT [-d n] ptlf-fajl\n");
   exit(2);
 }
 
@@ -970,33 +928,14 @@ int main(int argc, char *argv[])
   int i, len;
 
   for (i = 1; i < argc; i++) {
-    if (argv[i][0] == '-' && argv[i][1] && argv[i][2] == 0) {
+    if ((argv[i][0] == '-') && (argv[i][1] == 'd' || argv[i][1] == 'D') && argv[i][2] == 0) {
       if (i + 1 >= argc) usage();
-      switch (argv[i][1]) {
-      case 'a': case 'A': opt_appr_limit = atoi(argv[++i]); break;
-      case 'c': case 'C':
-        strncpy(opt_home, argv[++i], 2); opt_home[2] = 0;
-        if (opt_home[0] >= 'a') opt_home[0] -= 32;
-        if (opt_home[1] >= 'a') opt_home[1] -= 32;
-        break;
-      case 'r': case 'R': opt_respfile = argv[++i]; break;
-      case 'z': case 'Z': opt_tz_min = atol(argv[++i]); opt_tz_set = 1; break;
-      case 'd': case 'D': opt_dump = atoi(argv[++i]); break;
-      case 'h': case 'H': {
-        int k; const char *v = argv[++i];
-        memset(opt_host, ' ', 4); opt_host[4] = 0;
-        for (k = 0; k < 4 && v[k]; k++)
-          opt_host[k] = (v[k] >= 'a' && v[k] <= 'z') ? (char)(v[k] - 32) : v[k];
-        break;
-      }
-      default: usage();
-      }
+      opt_dump = atoi(argv[++i]);
     } else if (!opt_file) opt_file = argv[i];
     else usage();
   }
   if (!opt_file) usage();
   load_builtin_resp();
-  if (opt_respfile) load_resp(opt_respfile);
 
   if (rd_open(opt_file)) return 1;
   while ((len = rd_next(buf, MAXREC)) > 0) process(buf, len);

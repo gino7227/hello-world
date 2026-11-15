@@ -10,18 +10,11 @@
  *   5. Mellekletkent a sztorno/korrekcio okokat
  *
  * Hasznalat (Guardian):
- *   RUN TLFRPT /OUT $S.#TLFRPT/ [-a nn] [-r respfile] [-z perc] [-d n]
- *                              $DATA.TLF.TL261114
+ *   RUN TLFRPT /OUT $S.#TLFRPT/ $DATA.TLF.TL261114
+ *   RUN TLFRPT -d 5 $DATA.TLF.TL261114      (diagnosztika)
  *
- *   -a nn      elso ELUTASITO ok-kod (a valaszkod 2-3. jegye, alap: 50);
- *              ennel kisebb, illetve a 90-92 = engedelyezett
- *   -r fajl    valaszkod-megnevezesek felulirasa/kiegeszitese ("nnn szoveg"
- *              soronkent, # = megjegyzes). A BASE24-atm kodok be vannak
- *              epitve, ez az opcio csak eltereshez kell.
- *   -z perc    idoeltolas GMT-hez kepest percben (alap Guardianon: a rendszer
- *              helyi ideje; mashol: 0)
- *   -d n       diagnosztika: az elso n tranzakcios rekord mezoinek kiirasa
- *              (kartyaszam, szamlaszam es egyenleg NELKUL), majd kilep
+ *   -d n   az elso n tranzakcios rekord mezoinek kiirasa
+ *          (kartyaadat nelkul), majd kilep
  *
  * A mezopoziciok a BASE24-atm Release 6.0 DDLTLF / DDLGDEFS alapjan:
  * HEAD = 76 bajt, AUTH = 398 bajt, minimalis rekordhossz 474 bajt.
@@ -78,6 +71,7 @@
 #define OFF_ADMIN_CDE     90   /* TERM-SETL/TERM-CASH/SETL-TTL.ADMIN-CDE 9(2) */
 
 #define MAXREC            4096
+#define APPR_LIMIT        50     /* ok-kod 00-49 es 90-92 = engedelyezett */
 #define RT_MAX_MS         5000
 #define MAX_CRNCY         64
 #define MAX_LN            64
@@ -110,7 +104,7 @@ static const char *dec_long[NDEC] = {
   "Host (online)", "BASE24 Authorization", "STIP (host nem elerheto)",
   "Host Interface", "Interchange (RESP. 6/7)", "Egyeb" };
 
-/* ---------- Beepitett BASE24-atm valaszkodok (a -r fajl felulirhatja) ---------- */
+/* ---------- Beepitett BASE24-atm valaszkodok ---------- */
 static const struct { int code; const char *desc; } resp_builtin[] = {
   {  0, "Approved with balances"},
   {  1, "Approved - no balances"},
@@ -196,10 +190,6 @@ static int is_fault(int typ, int c)
 }
 
 /* ---------- Opciok ---------- */
-static int  opt_appr_limit = 50;
-static const char *opt_respfile = NULL;
-static int  opt_tz_set = 0;
-static long opt_tz_min = 0;
 static int  opt_dump = 0;
 static const char *opt_file = NULL;
 
@@ -352,24 +342,22 @@ typedef struct { int y, mo, d, h, mi, s; } TmX;
 static int ts_local(long long jts, TmX *t)
 {
 #ifdef __TANDEM
-  if (!opt_tz_set) {
-    short dt[8];
-    long long l = CONVERTTIMESTAMP(jts, 0);  /* 0 = GMT -> helyi civil ido */
-    INTERPRETTIMESTAMP(l, dt);
-    t->y = dt[0]; t->mo = dt[1]; t->d = dt[2];
-    t->h = dt[3]; t->mi = dt[4]; t->s = dt[5];
-    return 0;
-  }
+  short dt[8];
+  long long l = CONVERTTIMESTAMP(jts, 0);  /* 0 = GMT -> helyi civil ido */
+  INTERPRETTIMESTAMP(l, dt);
+  t->y = dt[0]; t->mo = dt[1]; t->d = dt[2];
+  t->h = dt[3]; t->mi = dt[4]; t->s = dt[5];
+  return 0;
+#else
+  /* teszteleshez nem NonStop gepen: a TZ kornyezeti valtozo szerinti ido */
+  long long us = jts - JTS_UNIX_EPOCH;
+  time_t s = (time_t)(us / 1000000LL);
+  struct tm *g = localtime(&s);
+  if (!g) return -1;
+  t->y = g->tm_year + 1900; t->mo = g->tm_mon + 1; t->d = g->tm_mday;
+  t->h = g->tm_hour; t->mi = g->tm_min; t->s = g->tm_sec;
+  return 0;
 #endif
-  {
-    long long us = jts - JTS_UNIX_EPOCH;
-    time_t s = (time_t)(us / 1000000LL) + (time_t)opt_tz_min * 60;
-    struct tm *g = gmtime(&s);
-    if (!g) return -1;
-    t->y = g->tm_year + 1900; t->mo = g->tm_mon + 1; t->d = g->tm_mday;
-    t->h = g->tm_hour; t->mi = g->tm_min; t->s = g->tm_sec;
-    return 0;
-  }
 }
 
 static char *fmt_ts(long long jts, char *out)
@@ -438,24 +426,6 @@ static void load_builtin_resp(void)
     resp_desc[resp_builtin[i].code] = (char *)resp_builtin[i].desc;
 }
 
-static void load_resp(const char *fn)
-{
-  FILE *f = fopen(fn, "r"); char line[256];
-  if (!f) { fprintf(stderr, "Nem nyithato meg: %s (beepitett megnevezesekkel folytatom)\n", fn); return; }
-  while (fgets(line, sizeof line, f)) {
-    char *p = line, *e; long c;
-    while (*p == ' ') p++;
-    if (*p == '#' || *p == '\n' || *p == 0) continue;
-    c = strtol(p, &e, 10);
-    if (e == p || c < 0 || c > 999) continue;
-    while (*e == ' ' || *e == '\t') e++;
-    e[strcspn(e, "\r\n")] = 0;
-    resp_desc[c] = (char *)malloc(strlen(e) + 1);
-    if (resp_desc[c]) strcpy(resp_desc[c], e);
-  }
-  fclose(f);
-}
-
 /* ---------- Osztalyozas ---------- */
 static int classify(long tcde)
 {
@@ -499,7 +469,7 @@ static int decision(const unsigned char *r)
 static int approved_code(long resp)
 {
   long rs = resp % 100;
-  return rs < opt_appr_limit || (rs >= 90 && rs <= 92);
+  return rs < APPR_LIMIT || (rs >= 90 && rs <= 92);
 }
 
 static Crncy *get_crncy(int code)
@@ -749,7 +719,7 @@ static void report_summary(void)
   printf("           egyeb %s, rovid %s\n", fmt_n(n_other + n_skip_typ, d), fmt_n(n_short, e));
   printf("Kivetelek: 20/21 hibas STM adat %ld/%ld, 22 egyeb %ld\n",
          n_excp[0], n_excp[1], n_excp[2]);
-  printf("Engedelyezett: valaszkod 2-3. jegye < %02d, vagy 90-92\n\n", opt_appr_limit);
+  printf("Engedelyezett: valaszkod 2-3. jegye < %02d, vagy 90-92\n\n", APPR_LIMIT);
 
   head_ca("Tipus (0210/0220)");
   for (i = 0; i < NTYPE; i++) {
@@ -1086,7 +1056,7 @@ static void report_rvsl(void)
 /* ---------- main ---------- */
 static void usage(void)
 {
-  fprintf(stderr, "Hasznalat: TLFRPT [-a nn] [-r respfile] [-z perc] [-d n] tlf-fajl\n");
+  fprintf(stderr, "Hasznalat: TLFRPT [-d n] tlf-fajl\n");
   exit(2);
 }
 
@@ -1096,21 +1066,14 @@ int main(int argc, char *argv[])
   int i, len;
 
   for (i = 1; i < argc; i++) {
-    if (argv[i][0] == '-' && argv[i][1] && argv[i][2] == 0) {
+    if ((argv[i][0] == '-') && (argv[i][1] == 'd' || argv[i][1] == 'D') && argv[i][2] == 0) {
       if (i + 1 >= argc) usage();
-      switch (argv[i][1]) {
-      case 'a': case 'A': opt_appr_limit = atoi(argv[++i]); break;
-      case 'r': case 'R': opt_respfile = argv[++i]; break;
-      case 'z': case 'Z': opt_tz_min = atol(argv[++i]); opt_tz_set = 1; break;
-      case 'd': case 'D': opt_dump = atoi(argv[++i]); break;
-      default: usage();
-      }
+      opt_dump = atoi(argv[++i]);
     } else if (!opt_file) opt_file = argv[i];
     else usage();
   }
   if (!opt_file) usage();
   load_builtin_resp();
-  if (opt_respfile) load_resp(opt_respfile);
 
   if (rd_open(opt_file)) return 1;
   while ((len = rd_next(buf, MAXREC)) > 0) process(buf, len);
