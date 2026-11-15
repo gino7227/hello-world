@@ -292,9 +292,9 @@ static int rd_open(const char *name)
 static int rd_next(unsigned char *buf, int max)
 {
   unsigned short cnt = 0; short err = 0;
-  _cc_status cc = READX(fnum, (char *)buf, (unsigned short)max, &cnt);
-  if (!_status_eq(cc)) {
-    FILE_GETINFO_(fnum, &err);
+  READX(fnum, (char *)buf, (unsigned short)max, &cnt);
+  FILE_GETINFO_(fnum, &err);               /* 0 = rendben, 1 = EOF */
+  if (err != 0) {
     if (err == 1) return 0;                 /* EOF */
     fprintf(stderr, "READX hiba %d\n", err);
     return -1;
