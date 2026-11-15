@@ -26,7 +26,7 @@ PTLF-et, és a `CONVERTTIMESTAMP` segítségével a rendszer helyi idejére vál
 
 ## Futtatás
 ```
-RUN PTLFRPT /OUT $S.#PTLFRPT/ -r $DATA.B24RPT.RESPDESC $DATA.PTLF.PO261114
+RUN PTLFRPT /OUT $S.#PTLFRPT/ -h BICI -r $DATA.B24RPT.RESPDESC $DATA.PTLF.PO261114
 ```
 
 | Opció | Jelentés |
@@ -34,6 +34,7 @@ RUN PTLFRPT /OUT $S.#PTLFRPT/ -r $DATA.B24RPT.RESPDESC $DATA.PTLF.PO261114
 | `-a nnn` | Az első **elutasító** válaszkód (alap: `050`); ennél kisebb = engedélyezett |
 | `-c XX` | Hazai országkód a belföld/külföld bontáshoz (alap: `HU`) |
 | `-r fájl` | Válaszkód-megnevezések (`respdesc.txt` minta) |
+| `-h dest` | A saját host `DEST` neve (pl. `BICI`), ha a host interchange interfészen át kapcsolódik: `RESPONDER` 6/7 és ez a `DEST` → Host |
 | `-z perc` | Időeltolás GMT-hez képest percben (alap: a rendszer helyi ideje) |
 | `-d n` | Diagnosztika: az első *n* tranzakció mezőinek kiírása (kártyaadat nélkül) |
 

@@ -16,6 +16,8 @@
  *   -r fajl    valaszkod-megnevezesek ("nnn szoveg" soronkent, # = megjegyzes)
  *   -z perc    idoeltolas GMT-hez kepest percben (alap Guardianon: a rendszer
  *              helyi ideje; mashol: 0)
+ *   -h nev     a sajat host DEST neve (pl. BICI), ha a host interchange
+ *              interfeszen at kapcsolodik: RESPONDER 6/7 + ez a DEST = Host
  *   -d n       diagnosztika: az elso n tranzakcios rekord mezoinek kiirasa
  *              (kartyaszam, track2, lejarat es szamlaszam NELKUL), majd kilep
  *
@@ -106,6 +108,7 @@ static int  opt_tz_set = 0;
 static long opt_tz_min = 0;
 static int  opt_dump = 0;
 static const char *opt_file = NULL;
+static char opt_host[5] = "";       /* -h: sajat host DEST neve (pl. BICI) */
 
 /* ---------- Statisztikak ---------- */
 typedef struct { long cnt, appr; } CntAppr;
@@ -371,7 +374,11 @@ static int decision(const unsigned char *r)
   if (resp == '5') return D_HOST;
   if (resp == '3') return (rte > 0) ? D_STIP : D_B24;
   if (resp == '4') return D_HIF;
-  if (resp == '6' || resp == '7') return D_NET;
+  if (resp == '6' || resp == '7') {
+    /* ha a sajat host interchange interfeszen at kapcsolodik (-h) */
+    if (opt_host[0] && memcmp(r + OFF_DEST, opt_host, 4) == 0) return D_HOST;
+    return D_NET;
+  }
   return D_OTH;
 }
 
@@ -689,7 +696,10 @@ static void report_resp(void)
   resp_table(0);
   printf("\nB) Engedelyezo valaszkodok\n");
   resp_table(1);
-  printf("\nDontes helye: Host   = RESPONDER 5\n");
+  if (opt_host[0])
+    printf("\nDontes helye: Host   = RESPONDER 5, vagy 6/7 es DEST = %s\n", opt_host);
+  else
+    printf("\nDontes helye: Host   = RESPONDER 5\n");
   printf("              BASE24 = RESPONDER 3 es RTE-STAT 00\n");
   printf("              STIP   = RESPONDER 3 es RTE-STAT <> 00\n");
   printf("              HostIF = RESPONDER 4,  ICHG = RESPONDER 6/7\n");
@@ -810,7 +820,8 @@ static void report_country(void)
 /* ---------- main ---------- */
 static void usage(void)
 {
-  fprintf(stderr, "Hasznalat: PTLFRPT [-a nnn] [-c XX] [-r respfile] [-z perc] [-d n]\n"
+  fprintf(stderr, "Hasznalat: PTLFRPT [-a nnn] [-c XX] [-r respfile] [-z perc] [-h dest]\n"
+                  "                  [-d n]\n"
                   "                  ptlf-fajl\n");
   exit(2);
 }
@@ -833,6 +844,13 @@ int main(int argc, char *argv[])
       case 'r': case 'R': opt_respfile = argv[++i]; break;
       case 'z': case 'Z': opt_tz_min = atol(argv[++i]); opt_tz_set = 1; break;
       case 'd': case 'D': opt_dump = atoi(argv[++i]); break;
+      case 'h': case 'H': {
+        int k; const char *v = argv[++i];
+        memset(opt_host, ' ', 4); opt_host[4] = 0;
+        for (k = 0; k < 4 && v[k]; k++)
+          opt_host[k] = (v[k] >= 'a' && v[k] <= 'z') ? (char)(v[k] - 32) : v[k];
+        break;
+      }
       default: usage();
       }
     } else if (!opt_file) opt_file = argv[i];
