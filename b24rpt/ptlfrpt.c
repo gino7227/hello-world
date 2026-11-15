@@ -32,7 +32,9 @@
 #include <time.h>
 
 #ifdef __TANDEM
-#include <cextdecs.h>
+/* Guardian alatt a fajl neve $SYSTEM.SYSTEM.CEXTDECS (nincs "h" a vegen),
+   ezert ".h" nelkul, a szukseges szekciok felsorolasaval kell behuzni. */
+#include <cextdecs(FILE_OPEN_,READX,FILE_GETINFO_,FILE_CLOSE_,CONVERTTIMESTAMP,INTERPRETTIMESTAMP)>
 #include <tal.h>
 #endif
 
