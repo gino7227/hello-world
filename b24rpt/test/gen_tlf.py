@@ -35,10 +35,11 @@ def main():
     q = "<q" if a.little_endian else ">q"
     day = datetime(2026, 11, 14, tzinfo=timezone.utc)
     w = [2, 1, 1, 1, 1, 2, 6, 14, 20, 24, 26, 28, 32, 28, 26, 27, 30, 34, 30, 24, 17, 10, 7, 4]
-    atms = ["A%04d" % i for i in range(1, 41)]
+    atms = ["ATM%04d" % i for i in range(1, 41)]
+    foreign = ["N%05d" % i for i in range(1, 301)]
     locs = {t: ("BUDAPEST %s FIOK" % t[-2:]) for t in atms}
-    broken = "A0007"     # ez az ATM 10:00 utan elhallgat
-    faulty = "A0013"     # ennél sok a hardverhiba
+    broken = "ATM0007"     # ez az ATM 10:00 utan elhallgat
+    faulty = "ATM0013"     # ennél sok a hardverhiba
     recs = []
 
     def head(dt, term, rectyp):
@@ -55,7 +56,7 @@ def main():
     for _ in range(a.count):
         h = rnd.choices(range(24), weights=w)[0]
         dt = day + timedelta(hours=h, seconds=rnd.randrange(3600), microseconds=rnd.randrange(10**6))
-        term = rnd.choice(atms)
+        term = rnd.choice(atms) if rnd.random() < 0.75 else rnd.choice(foreign)
         if term == broken and dt.hour >= 9:
             term = rnd.choice(atms[:6])
         r = head(dt, term, "01")
@@ -96,7 +97,7 @@ def main():
         if declined:
             code = rnd.choices(["061", "058", "053", "051", "062", "150", "072"], weights=[30, 25, 20, 8, 5, 3, 9])[0]
         put(r, 255, code)
-        put(r, 258, locs[term].ljust(25))
+        put(r, 258, locs.get(term, "MAS BANK ATM").ljust(25))
         put(r, 305, "BUDAPEST     ")
         put(r, 321, "HU")
         put(r, 351, "348")

@@ -6,7 +6,7 @@
  *      kifizetett osszeg devizankent, elnyelt kartyak)
  *   2. Valaszkod-elemzest (dontes helye szerinti bontassal)
  *   3. Oranketi forgalmat (STIP, idotullepes, hardverhiba, host valaszido)
- *   4. ATM-enkenti forgalmat es a figyelendo ATM-ek listajat
+ *   4. Sajat ATM-enkenti forgalmat (TERM-ID "ATM...") es a figyelendo ATM-eket
  *   5. Mellekletkent a sztorno/korrekcio okokat
  *
  * Hasznalat (Guardian):
@@ -71,6 +71,7 @@
 #define OFF_ADMIN_CDE     90   /* TERM-SETL/TERM-CASH/SETL-TTL.ADMIN-CDE 9(2) */
 
 #define MAXREC            4096
+#define OWN_ATM_PREFIX    "ATM"  /* sajat ATM-ek TERM-ID elotagja */
 #define APPR_LIMIT        50     /* ok-kod 00-49 es 90-92 = engedelyezett */
 #define RT_MAX_MS         5000
 #define MAX_CRNCY         64
@@ -199,6 +200,7 @@ typedef struct { long cnt, appr; } CntAppr;
 static long n_rec, n_tran, n_short, n_admin, n_other, n_excp[3], n_skip_typ;
 static long n_retained;
 static CntAppr by_type[NTYPE], by_msg[NMSG], by_dec[NDEC], own_crd, frn_crd;
+static CntAppr own_atm, frn_atm;
 static long resp_cnt[1000][NDEC];
 static char *resp_desc[1000];
 static long rvsl_cnt[2][100];        /* [0]=0420, [1]=5400 */
@@ -620,6 +622,9 @@ static void process(const unsigned char *r, int len)
 
   if (memcmp(r + OFF_CRD_FIID, r + OFF_TERM_FIID, 4) == 0) { own_crd.cnt++; if (appr) own_crd.appr++; }
   else { frn_crd.cnt++; if (appr) frn_crd.appr++; }
+  if (memcmp(r + OFF_TERM_ID, OWN_ATM_PREFIX, strlen(OWN_ATM_PREFIX)) == 0)
+    { own_atm.cnt++; if (appr) own_atm.appr++; }
+  else { frn_atm.cnt++; if (appr) frn_atm.appr++; }
   if ((ls = get_ln(r + OFF_CRD_LN)) != NULL) { ls->cnt++; if (appr) ls->appr++; }
 
   /* osszegek */
@@ -744,6 +749,11 @@ static void report_summary(void)
     x.cnt = lnst[i].cnt; x.appr = lnst[i].appr;
     row_ca(nm, &x);
   }
+
+  printf("\n");
+  head_ca("ATM");
+  row_ca("Sajat ATM (" OWN_ATM_PREFIX "...)", &own_atm);
+  row_ca("Idegen ATM", &frn_atm);
 
   printf("\n");
   head_ca("Dontes helye");
@@ -950,18 +960,26 @@ static int flag_stopped(const Term *t)
 
 static void report_atm(void)
 {
-  int i, n = 0, k, nfl = 0, idx[TERM_SLOTS];
+  int i, n = 0, k, nfl = 0, nfrn = 0, idx[TERM_SLOTS];
   long tcnt = 0, tdecl = 0;
   char a[64], b[32], c[32], d[32], e[32], f[32];
 
-  print_header("ATM-ENKENTI FORGALOM");
-  for (i = 0; i < TERM_SLOTS; i++)
-    if (terms[i].used && terms[i].cnt > 0) {
+  print_header("SAJAT ATM-EK FORGALMA");
+  /* csak a sajat ATM-ek (TERM-ID = OWN_ATM_PREFIX...) kerulnek a listaba,
+     az idegen ATM-ek (ugyfeleink mas bankok ATM-jein) csak osszesitve */
+  for (i = 0; i < TERM_SLOTS; i++) {
+    if (!terms[i].used || terms[i].cnt == 0) continue;
+    if (strncmp(terms[i].id, OWN_ATM_PREFIX, strlen(OWN_ATM_PREFIX)) == 0) {
       g_tl[n++] = &terms[i]; tcnt += terms[i].cnt; tdecl += terms[i].decl;
-    }
+    } else nfrn++;
+  }
   qsort(g_tl, n, sizeof(Term *), cmp_term_id);
   avg_decl = tcnt ? 100.0 * tdecl / tcnt : 0;
-  printf("ATM-ek szama: %d   (tranzakcio nelkuli ATM-ek nem szerepelnek)\n", n);
+  printf("Sajat ATM-ek (%s...): %d   (tranzakcio nelkuliek nem szerepelnek)\n",
+         OWN_ATM_PREFIX, n);
+  printf("Idegen ATM-ek: %d terminal, %s tranzakcio, elutasitas %s\n", nfrn,
+         fmt_n(frn_atm.cnt, a), pct(frn_atm.cnt - frn_atm.appr, frn_atm.cnt, b));
+  printf("(az idegen ATM-ek egyenkent nem szerepelnek, lasd a napi osszesitot)\n");
   if (terms_full) printf("FIGYELEM: tul sok ATM, a lista hianyos!\n");
 
   /* figyelendo ATM-ek: csak az atlagtol erdemben eltero esetek
@@ -985,7 +1003,7 @@ static void report_atm(void)
     if (sc > 0) idx[nfl++] = i;
   }
   qsort(idx, nfl, sizeof(int), cmp_term_score);
-  printf("\nA) Figyelendo ATM-ek (legfeljebb 30)\n");
+  printf("\nA) Figyelendo sajat ATM-ek (legfeljebb 30)\n");
   printf("%-11s%-20s%s\n", "Terminal", "Hely", "Ok");
   line(RPT_W, '-');
   if (!nfl) printf("  nincs\n");
@@ -1006,7 +1024,7 @@ static void report_atm(void)
   printf("(atlag/ATM: hiba %s, elnyelt %s, elutasitas %s%%)\n",
          fmt_d(avg_fault, 1, a), fmt_d(avg_ret, 1, b), fmt_d(avg_decl, 1, c));
 
-  printf("\nB) Minden ATM (azonosito szerint)\n");
+  printf("\nB) Minden sajat ATM (azonosito szerint)\n");
   printf("%-10s %-12s%7s%7s%7s%13s%5s%5s%4s%6s\n", "Terminal", "Hely", "Darab", "Elut%",
          "Felv.", "Kifizetve", "Hiba", "Elny", "Kaz", "Utols");
   line(RPT_W, '-');

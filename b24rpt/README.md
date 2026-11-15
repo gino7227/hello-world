@@ -5,7 +5,7 @@ Két önálló C program Guardian alá:
 | Program | Bemenet | Riportok |
 |---|---|---|
 | `ptlfrpt.c` | BASE24-pos PTLF (`POyymmdd`) | napi összesítő, válaszkód-elemzés, óránkénti forgalom, országlista |
-| `tlfrpt.c` | BASE24-atm TLF (`TLyymmdd`) | napi összesítő, válaszkód-elemzés, óránkénti forgalom, ATM-enkénti forgalom, sztornóokok |
+| `tlfrpt.c` | BASE24-atm TLF (`TLyymmdd`) | napi összesítő, válaszkód-elemzés, óránkénti forgalom, saját ATM-ek forgalma (`ATM...`), sztornóokok |
 
 A kimenet ékezet nélküli ASCII, legfeljebb 79 oszlop: terminálon és spoolerben is olvasható.
 Kártyaszámot, Track 2-t, lejáratot, számlaszámot és egyenleget egyik program sem ír ki.
