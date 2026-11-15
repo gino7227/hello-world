@@ -549,38 +549,49 @@ static void process(const unsigned char *r, int len)
 /* ---------- Riportok ---------- */
 static void line(int n, char c) { while (n-- > 0) putchar(c); putchar('\n'); }
 
+/* Minden riportsor legfeljebb RPT_W karakter, hogy 80 oszlopos terminalon
+   se torjon meg. */
+#define RPT_W 79
+
 static void print_header(const char *title)
 {
   char a[32], b[32];
   printf("\n");
-  line(100, '=');
+  line(RPT_W, '=');
   printf("BASE24 POS (KIBOCSATOI) - %s\n", title);
-  printf("Forras: %s    Idoszak: %s - %s\n", opt_file, fmt_ts(first_ts, a), fmt_ts(last_ts, b));
-  line(100, '=');
+  printf("Forras:  %s\n", opt_file);
+  printf("Idoszak: %s - %s\n", fmt_ts(first_ts, a), fmt_ts(last_ts, b));
+  line(RPT_W, '=');
 }
 
 static void row_ca(const char *name, CntAppr *x)
 {
   char a[32], b[32], c[32], d[32];
-  printf("%-26s%12s%15s%13s%10s\n", name, fmt_n(x->cnt, a), fmt_n(x->appr, b),
+  printf("%-28.28s%11s%14s%13s%10s\n", name, fmt_n(x->cnt, a), fmt_n(x->appr, b),
          fmt_n(x->cnt - x->appr, c), pct(x->appr, x->cnt, d));
+}
+
+static void head_ca(const char *first)
+{
+  printf("%-28s%11s%14s%13s%10s\n", first, "Osszes", "Engedelyez.", "Elutasitott", "Jovah.%");
+  line(76, '-');
 }
 
 static void report_summary(void)
 {
   int i; CntAppr tot = {0, 0};
-  char a[40], b[40], c[40], d[40], e[40], f[40];
+  char a[40], b[40], c[40], d[40], e[40];
 
   print_header("NAPI OSSZESITO");
-  printf("Rekordok: osszes %s, tranzakcio %s, terminal/osszesito %s, egyeb %s, rovid %s\n",
-         fmt_n(n_rec, a), fmt_n(n_tran, b), fmt_n(n_setl, c), fmt_n(n_other + n_skip_typ, d),
-         fmt_n(n_short, e));
-  printf("Kivetel-rekordok: 20(konyvelt) %ld, 21(nem konyvelt) %ld, 22(reszben) %ld, 23(hibas adat) %ld\n",
-         n_excp[0], n_excp[1], n_excp[2], n_excp[3]);
+  printf("Rekordok:  osszes %s, tranzakcio %s, terminal-osszesito %s,\n",
+         fmt_n(n_rec, a), fmt_n(n_tran, b), fmt_n(n_setl, c));
+  printf("           egyeb %s, rovid %s\n", fmt_n(n_other + n_skip_typ, d), fmt_n(n_short, e));
+  printf("Kivetelek: 20 konyvelt %ld, 21 nem konyvelt %ld, 22 reszben %ld,\n",
+         n_excp[0], n_excp[1], n_excp[2]);
+  printf("           23 hibas adat %ld\n", n_excp[3]);
   printf("Engedelyezett: valaszkod < %03d\n\n", opt_appr_limit);
 
-  printf("%-26s%12s%15s%13s%10s\n", "Tipus", "Osszes", "Engedelyezett", "Elutasitott", "Jovah.%");
-  line(76, '-');
+  head_ca("Tipus");
   for (i = 0; i < NTYPE; i++) {
     if (!by_type[i].cnt) continue;
     row_ca(type_name[i], &by_type[i]);
@@ -589,16 +600,17 @@ static void report_summary(void)
   line(76, '-');
   row_ca("OSSZESEN", &tot);
 
-  printf("\n%-26s%12s%15s%13s%10s\n", "Bontas", "Osszes", "Engedelyezett", "Elutasitott", "Jovah.%");
-  line(76, '-');
+  printf("\n");
+  head_ca("Bontas");
   row_ca("Belfold", &dom);
   row_ca("Kulfold", &frn);
+
   printf("\n");
+  head_ca("Dontes helye");
   for (i = 0; i < NDEC; i++) if (by_dec[i].cnt) row_ca(dec_long[i], &by_dec[i]);
 
-  printf("\n%-26s%12s%15s%13s%10s\n", "Engedelyezo (RESPONDER)", "Osszes", "Engedelyezett",
-         "Elutasitott", "Jovah.%");
-  line(76, '-');
+  printf("\n");
+  head_ca("Engedelyezo (RESPONDER)");
   for (i = 0; i < n_authz; i++) {
     char nm[40]; CntAppr x;
     sprintf(nm, "%.16s (%c)", authz[i].name, authz[i].resp);
@@ -606,21 +618,24 @@ static void report_summary(void)
     row_ca(nm, &x);
   }
 
+  /* devizankent soronkent egy blokk, hogy a nagy osszegek is elferjenek */
   printf("\nEngedelyezett osszegek devizankent (a tranzakcio devizajaban)\n");
-  printf("%-6s%9s%17s%17s%17s%17s%17s\n", "Deviza", "Db", "Vasarlas+lez.", "Visszaterites",
-         "Sztorno", "Netto", "Eloeng.(zarolt)");
-  line(100, '-');
+  line(RPT_W, '-');
   for (i = 0; i < n_crncy; i++) {
     Crncy *c0 = &crncy[i];
     const char *nm = crncy_name(c0->code);
     char cn[8];
     if (nm) strcpy(cn, nm); else sprintf(cn, "%03d", c0->code);
-    printf("%-6s%9s%17s%17s%17s%17s%17s\n", cn, fmt_n(c0->cnt, a),
-           fmt_amt(c0->pur, c0->code, b), fmt_amt(c0->ref, c0->code, c),
-           fmt_amt(c0->rev, c0->code, d), fmt_amt(c0->pur - c0->ref - c0->rev, c0->code, e),
-           fmt_amt(c0->pre, c0->code, f));
+    printf("%-4s %s db\n", cn, fmt_n(c0->cnt, a));
+    printf("     Vasarlas+lezaras  %18s   Visszaterites   %17s\n",
+           fmt_amt(c0->pur, c0->code, b), fmt_amt(c0->ref, c0->code, c));
+    printf("     Sztorno           %18s   Eloeng.(zarolt) %17s\n",
+           fmt_amt(c0->rev, c0->code, d), fmt_amt(c0->pre, c0->code, e));
+    printf("     NETTO             %18s\n", fmt_amt(c0->pur - c0->ref - c0->rev, c0->code, b));
   }
-  printf("Netto = vasarlas + lezaras + MOTO + keszpenz + cashback - visszaterites - sztorno\n");
+  line(RPT_W, '-');
+  printf("Netto = vasarlas + lezaras + MOTO + keszpenz + cashback\n");
+  printf("        - visszaterites - sztorno\n");
 }
 
 static long g_sort_tot[1000];
@@ -632,32 +647,36 @@ static int cmp_code(const void *a, const void *b)
 
 static void resp_table(int approved)
 {
-  int idx[1000], n = 0, i, k; long tot = 0;
-  char a[32], b[32], c[NDEC][16];
+  int idx[1000], n = 0, i, k, used[NDEC]; long tot = 0;
+  char a[32], b[32], c[16];
+  for (k = 0; k < NDEC; k++) used[k] = 0;
   for (i = 0; i < 1000; i++) {
     long s = 0;
     if ((i < opt_appr_limit) != approved) continue;
-    for (k = 0; k < NDEC; k++) s += resp_cnt[i][k];
+    for (k = 0; k < NDEC; k++) { s += resp_cnt[i][k]; if (resp_cnt[i][k]) used[k] = 1; }
     if (!s) continue;
     g_sort_tot[i] = s; tot += s; idx[n++] = i;
   }
+  if (!n) { printf("  nincs\n"); return; }
   qsort(idx, n, sizeof(int), cmp_code);
-  printf("%-4s%-30s%9s%9s", "Kod", "Megnevezes", "Darab", "Arany");
-  for (k = 0; k < NDEC; k++) printf("%8s", dec_name[k]);
+  /* csak azok a dontes-oszlopok jelennek meg, amelyekben van adat */
+  printf("%-4s%-20s%8s%8s", "Kod", "Megnevezes", "Darab", "Arany");
+  for (k = 0; k < NDEC; k++) if (used[k]) printf("%7s", dec_name[k]);
   printf("\n");
-  line(100, '-');
+  line(RPT_W, '-');
   for (i = 0; i < n; i++) {
-    int code = idx[i]; char desc[31];
-    strncpy(desc, resp_desc[code] ? resp_desc[code] : "", 29); desc[29] = 0;
-    printf("%03d %-30s%9s%9s", code, desc, fmt_n(g_sort_tot[code], a), pct(g_sort_tot[code], tot, b));
+    int code = idx[i]; char desc[21];
+    strncpy(desc, resp_desc[code] ? resp_desc[code] : "", 19); desc[19] = 0;
+    printf("%03d %-20s%8s%8s", code, desc, fmt_n(g_sort_tot[code], a), pct(g_sort_tot[code], tot, b));
     for (k = 0; k < NDEC; k++) {
-      if (resp_cnt[code][k]) fmt_n(resp_cnt[code][k], c[k]); else strcpy(c[k], "-");
-      printf("%8s", c[k]);
+      if (!used[k]) continue;
+      if (resp_cnt[code][k]) fmt_n(resp_cnt[code][k], c); else strcpy(c, "-");
+      printf("%7s", c);
     }
     printf("\n");
   }
-  line(100, '-');
-  printf("    %-30s%9s\n", "OSSZESEN", fmt_n(tot, a));
+  line(RPT_W, '-');
+  printf("    %-20s%8s\n", "OSSZESEN", fmt_n(tot, a));
 }
 
 static void report_resp(void)
@@ -670,9 +689,10 @@ static void report_resp(void)
   resp_table(0);
   printf("\nB) Engedelyezo valaszkodok\n");
   resp_table(1);
-  printf("\nDontes helye: Host=RESPONDER 5, BASE24=RESPONDER 3 es RTE-STAT 00, "
-         "STIP=RESPONDER 3 es RTE-STAT<>00,\n              HostIF=RESPONDER 4, "
-         "ICHG=RESPONDER 6/7\n");
+  printf("\nDontes helye: Host   = RESPONDER 5\n");
+  printf("              BASE24 = RESPONDER 3 es RTE-STAT 00\n");
+  printf("              STIP   = RESPONDER 3 es RTE-STAT <> 00\n");
+  printf("              HostIF = RESPONDER 4,  ICHG = RESPONDER 6/7\n");
 }
 
 static long pctile(const unsigned long *hist, long n, double p)
@@ -682,6 +702,8 @@ static long pctile(const unsigned long *hist, long n, double p)
   for (i = 0; i <= RT_MAX_MS; i++) { acc += (long)hist[i]; if (acc >= need) return i; }
   return RT_MAX_MS;
 }
+
+#define BAR_W 22
 
 static void report_hourly(void)
 {
@@ -695,48 +717,49 @@ static void report_hourly(void)
     if (hour[h].cnt > mx) { mx = hour[h].cnt; peak_h = h; }
     tot += hour[h].cnt; decl += hour[h].decl;
   }
-  printf("%-7s%9s%8s%7s%8s%9s%9s  %s\n", "Ora", "Darab", "Elut.%", "STIP", "TO-szt",
-         "Atl.ms", "p95 ms", "");
-  line(100, '-');
+  printf("%-6s%8s%7s%6s%6s%6s%6s\n", "Ora", "Darab", "Elut%", "STIP", "TOszt", "Atlms", "p95ms");
+  line(RPT_W, '-');
   for (h = 0; h < 24; h++) {
-    Hour *x = &hour[h]; int bar = mx ? (int)((x->cnt * 35 + mx / 2) / mx) : 0;
+    Hour *x = &hour[h]; int bar = mx ? (int)((x->cnt * BAR_W + mx / 2) / mx) : 0;
     double dr = x->cnt ? 100.0 * x->decl / x->cnt : 0;
-    char drs[16]; char *cm;
-    sprintf(drs, "%.1f%%", dr); if ((cm = strchr(drs, '.')) != NULL) *cm = ',';
+    char drs[16];
+    fmt_d(dr, 1, drs);
     if (x->rt_n) {
       sprintf(e, "%lld", x->rt_sum_us / x->rt_n / 1000);
       sprintf(f, "%ld", pctile(x->rt_hist, x->rt_n, 0.95));
     } else { strcpy(e, "-"); strcpy(f, "-"); }
-    printf("%02d-%02d  %9s%8s%7s%8s%9s%9s  ", h, h + 1, fmt_n(x->cnt, a),
+    printf("%02d-%02d %8s%7s%6s%6s%6s%6s ", h, h + 1, fmt_n(x->cnt, a),
            x->cnt ? drs : "-", x->stip ? fmt_n(x->stip, b) : "-",
            x->tmo_rev ? fmt_n(x->tmo_rev, c) : "-", e, f);
     for (i = 0; i < bar; i++) putchar('#');
-    if (x->cnt && x->cnt >= 50 && decl && dr > 2.0 * 100.0 * decl / tot) printf(" <-- ELUT");
-    if (h == peak_h && mx) printf(" <-- CSUCS");
+    if (x->cnt && x->cnt >= 50 && decl && dr > 2.0 * 100.0 * decl / tot) printf(" <ELUT");
+    if (h == peak_h && mx) printf(" <CSUCS");
     printf("\n");
     for (i = 0; i <= RT_MAX_MS; i++) all_hist[i] += x->rt_hist[i];
     all_n += x->rt_n; all_sum += x->rt_sum_us;
   }
-  line(100, '-');
+  line(RPT_W, '-');
+  printf("Elut%% = elutasitasi arany, TOszt = idotullepes miatti sztorno\n");
+  printf("(0420, RVRL-CDE 01), Atlms/p95ms = host valaszido (ms)\n\n");
   for (i = 0; i < 1440; i++) if (minute_cnt[i] > pm) { pm = minute_cnt[i]; pmi = i; }
   for (i = 0; i < 86400; i++) if (second_cnt[i] > ps) { ps = second_cnt[i]; psi = i; }
   printf("Napi atlag:      %s tranzakcio/mp\n", fmt_d(tot / 86400.0, 2, a));
   if (mx) {
     fmt_d(mx / 3600.0, 2, a);
-    printf("Csucsora:        %02ld:00-%02ld:00  %s db  atlag %s tranzakcio/mp\n",
+    printf("Csucsora:        %02ld:00-%02ld:00  %s db, atlag %s tr/mp\n",
            peak_h, peak_h + 1, fmt_n(mx, b), a);
     fmt_d(pm / 60.0, 1, a);
-    printf("Csucsperc:       %02ld:%02ld        %s db  atlag %s tranzakcio/mp\n",
+    printf("Csucsperc:       %02ld:%02ld        %s db, atlag %s tr/mp\n",
            pmi / 60, pmi % 60, fmt_n(pm, b), a);
-    printf("Csucsmasodperc:  %02ld:%02ld:%02ld     %ld tranzakcio/mp\n",
+    printf("Csucsmasodperc:  %02ld:%02ld:%02ld     %ld tr/mp\n",
            psi / 3600, (psi / 60) % 60, psi % 60, ps);
   }
   if (all_n) {
-    printf("Host valaszido:  atlag %lld ms, median %ld ms, p95 %ld ms, p99 %ld ms (%s meres)\n",
+    printf("Host valaszido:  atlag %lld ms, median %ld ms, p95 %ld ms, p99 %ld ms\n",
            all_sum / all_n / 1000, pctile(all_hist, all_n, 0.5), pctile(all_hist, all_n, 0.95),
-           pctile(all_hist, all_n, 0.99), fmt_n(all_n, a));
+           pctile(all_hist, all_n, 0.99));
+    printf("                 (%s meres)\n", fmt_n(all_n, a));
   }
-  printf("TO-szt = idotullepes miatti sztorno (0420, RVRL-CDE 01)\n");
 
   /* STIP idoszakok: STIP-es percek, legfeljebb STIP_GAP perc szunettel osszevonva */
   printf("\nSTIP-idoszakok (host nem elerheto):\n");
@@ -787,7 +810,8 @@ static void report_country(void)
 /* ---------- main ---------- */
 static void usage(void)
 {
-  fprintf(stderr, "Hasznalat: PTLFRPT [-a nnn] [-c XX] [-r respfile] [-z perc] [-d n] ptlf-fajl\n");
+  fprintf(stderr, "Hasznalat: PTLFRPT [-a nnn] [-c XX] [-r respfile] [-z perc] [-d n]\n"
+                  "                  ptlf-fajl\n");
   exit(2);
 }
 
