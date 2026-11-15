@@ -54,11 +54,14 @@
 #define OFF_TRAN_TIM      212  /* AUTH.TRAN-TIM        HHMMSSTT           */
 #define OFF_TERM_CITY     297  /* AUTH.TERM-CITY       X(13)              */
 #define OFF_TERM_CNTRY    313  /* AUTH.TERM-CNTRY-CDE  X(2)               */
+#define OFF_ORIG          370  /* AUTH.ORIG            X(4)               */
+#define OFF_DEST          374  /* AUTH.DEST            X(4)               */
 #define OFF_TC            378  /* AUTH.TRAN-CDE.TC     XX                 */
 #define OFF_T             380  /* AUTH.TRAN-CDE.T      X                  */
 #define OFF_RESP_CDE      405  /* AUTH.RESP-CDE        999                */
 #define OFF_AMT_1         408  /* AUTH.AMT-1           BINARY 64          */
 #define OFF_AMT_2         416  /* AUTH.AMT-2           BINARY 64          */
+#define OFF_AUTHORIZER    516  /* AUTH.AUTHORIZER      X(16)              */
 #define OFF_AUTH_IND      532  /* AUTH.AUTH-IND        X                  */
 #define OFF_APPRV_CDE     539  /* AUTH.APPRV-CDE       X(8)               */
 #define OFF_RVRL_CDE      582  /* AUTH.RVRL-CDE        99                 */
@@ -72,6 +75,7 @@
 #define MAX_CRNCY         64
 #define STIP_GAP          5      /* STIP-idoszakok osszevonasa (perc) */
 #define MAX_CNTRY         400
+#define MAX_AUTHZ         64
 
 /* JULIANTIMESTAMP ertek 1970-01-01 00:00:00 GMT-kor (mikroszekundum) */
 #define JTS_UNIX_EPOCH    210866760000000000LL
@@ -89,10 +93,10 @@ static const char *type_name[NTYPE] = {
 /* ---------- Dontes helye ---------- */
 enum { D_HOST, D_B24, D_STIP, D_HIF, D_NET, D_OTH, NDEC };
 static const char *dec_name[NDEC] = {
-  "Host", "BASE24", "STIP", "HostIF", "Halozat", "Egyeb" };
+  "Host", "BASE24", "STIP", "HostIF", "ICHG", "Egyeb" };
 static const char *dec_long[NDEC] = {
   "Host (online)", "BASE24 Authorization", "STIP (host nem elerheto)",
-  "Host Interface", "Halozat (interchange)", "Egyeb" };
+  "Host Interface", "Interchange (RESP. 6/7)", "Egyeb" };
 
 /* ---------- Opciok ---------- */
 static int  opt_appr_limit = 50;
@@ -131,6 +135,10 @@ static Crncy crncy[MAX_CRNCY]; static int n_crncy;
 
 typedef struct { char cc[3]; long cnt, decl; } Cntry;
 static Cntry cntry[MAX_CNTRY]; static int n_cntry;
+
+/* engedelyezo (AUTH.AUTHORIZER) + RESPONDER szerinti bontas */
+typedef struct { char name[17]; char resp; long cnt, appr; } Authz;
+static Authz authz[MAX_AUTHZ]; static int n_authz;
 
 static int big_endian = 1, endian_known = 0;
 
@@ -408,20 +416,25 @@ static void dump_rec(const unsigned char *r, int len, long n)
   printable(r + OFF_ISS_CDE, 2, b);
   printf("   ORIGINATOR=%c RESPONDER=%c RTE-STAT=%s ISS-CDE=%s AUTH-IND=%c\n",
          r[OFF_ORIGINATOR], r[OFF_RESPONDER], a, b, r[OFF_AUTH_IND]);
+  printable(r + OFF_ORIG, 4, a);
+  printable(r + OFF_DEST, 4, b);
+  printable(r + OFF_AUTHORIZER, 16, c);
+  printf("   ORIG='%s' DEST='%s' AUTHORIZER='%s'\n", a, b, c);
   printable(r + OFF_ORIG_CRNCY, 3, a);
   printable(r + OFF_TERM_CNTRY, 2, b);
-  printable(r + OFF_TERM_CITY, 13, c);
   printable(r + OFF_APPRV_CDE + 6, 2, d);
   printable(r + OFF_RVRL_CDE, 2, e);
-  printf("   AMT-1=%lld AMT-2=%lld CRNCY=%s CNTRY=%s CITY=%s APPRV(7-8)='%s' RVRL=%s\n",
-         get64(r + OFF_AMT_1), get64(r + OFF_AMT_2), a, b, c, d, e);
+  printf("   AMT-1=%lld AMT-2=%lld CRNCY=%s CNTRY=%s RVRL=%s APPRV(7-8)='%s'\n",
+         get64(r + OFF_AMT_1), get64(r + OFF_AMT_2), a, b, e, d);
+  printable(r + OFF_TERM_CITY, 13, c);
+  printable(r + OFF_ENTRY_MDE, 3, d);
+  printf("   CITY='%s' ENTRY-MDE=%s\n", c, d);
   fmt_ts(get64(r + OFF_DAT_TIM), a);
   printable(r + OFF_TRAN_DAT, 6, b);
   printable(r + OFF_TRAN_TIM, 8, c);
-  printable(r + OFF_ENTRY_MDE, 3, d);
-  printf("   DAT-TIM=%s TRAN-DAT=%s TRAN-TIM=%s ENTRY-MDE=%s host valaszido=%s\n",
-         a, b, c, d,
-         (et && rt && rt >= et) ? (sprintf(e, "%lld ms", (rt - et) / 1000), e) : "-");
+  printf("   DAT-TIM=%s TRAN-DAT=%s TRAN-TIM=%s\n", a, b, c);
+  if (et && rt && rt >= et) printf("   host valaszido=%lld ms\n", (rt - et) / 1000);
+  else printf("   host valaszido=-\n");
 }
 
 /* ---------- Feldolgozas ---------- */
@@ -472,6 +485,22 @@ static void process(const unsigned char *r, int len)
   by_type[ty].cnt++;  if (appr) by_type[ty].appr++;
   by_dec[dc].cnt++;   if (appr) by_dec[dc].appr++;
   resp_cnt[resp][dc]++;
+
+  /* engedelyezo */
+  {
+    char nm[17]; int k; Authz *az = NULL;
+    printable(r + OFF_AUTHORIZER, 16, nm);
+    for (k = 15; k >= 0 && nm[k] == ' '; k--) nm[k] = 0;
+    if (!nm[0]) strcpy(nm, "(ures)");
+    for (k = 0; k < n_authz; k++)
+      if (authz[k].resp == (char)r[OFF_RESPONDER] && strcmp(authz[k].name, nm) == 0) { az = &authz[k]; break; }
+    if (!az && n_authz < MAX_AUTHZ) {
+      az = &authz[n_authz++];
+      memset(az, 0, sizeof(Authz));
+      strcpy(az->name, nm); az->resp = (char)r[OFF_RESPONDER];
+    }
+    if (az) { az->cnt++; if (appr) az->appr++; }
+  }
 
   /* orszag */
   cc[0] = (char)r[OFF_TERM_CNTRY]; cc[1] = (char)r[OFF_TERM_CNTRY + 1]; cc[2] = 0;
@@ -567,6 +596,16 @@ static void report_summary(void)
   printf("\n");
   for (i = 0; i < NDEC; i++) if (by_dec[i].cnt) row_ca(dec_long[i], &by_dec[i]);
 
+  printf("\n%-26s%12s%15s%13s%10s\n", "Engedelyezo (RESPONDER)", "Osszes", "Engedelyezett",
+         "Elutasitott", "Jovah.%");
+  line(76, '-');
+  for (i = 0; i < n_authz; i++) {
+    char nm[40]; CntAppr x;
+    sprintf(nm, "%.16s (%c)", authz[i].name, authz[i].resp);
+    x.cnt = authz[i].cnt; x.appr = authz[i].appr;
+    row_ca(nm, &x);
+  }
+
   printf("\nEngedelyezett osszegek devizankent (a tranzakcio devizajaban)\n");
   printf("%-6s%9s%17s%17s%17s%17s%17s\n", "Deviza", "Db", "Vasarlas+lez.", "Visszaterites",
          "Sztorno", "Netto", "Eloeng.(zarolt)");
@@ -633,7 +672,7 @@ static void report_resp(void)
   resp_table(1);
   printf("\nDontes helye: Host=RESPONDER 5, BASE24=RESPONDER 3 es RTE-STAT 00, "
          "STIP=RESPONDER 3 es RTE-STAT<>00,\n              HostIF=RESPONDER 4, "
-         "Halozat=RESPONDER 6/7\n");
+         "ICHG=RESPONDER 6/7\n");
 }
 
 static long pctile(const unsigned long *hist, long n, double p)
