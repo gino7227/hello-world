@@ -63,3 +63,33 @@ python3 test/gen_ptlf.py /tmp/po.dat          # szintetikus PTLF, kártyaszám n
 gcc -std=c89 -Wall -o /tmp/ptlfrpt ptlfrpt.c
 /tmp/ptlfrpt -z 60 -r respdesc.txt /tmp/po.dat
 ```
+
+---
+
+# TLFRPT – BASE24-atm TLF napi riport
+
+Ugyanígy működik, mint a PTLFRPT, a napi ATM tranzakciós naplóra (`TLyymmdd`).
+
+1. **Napi összesítő** – tranzakciótípus, üzenettípus (0210/0220/0420/5400), saját/idegen kártya,
+   kártyahálózat (`CRD.LN`), döntés helye, elnyelt kártyák, nettó kifizetés devizánként.
+2. **Válaszkód-elemzés** – a BASE24-atm kódok be vannak építve (`1xx` = elnyelt kártya).
+3. **Óránkénti forgalom** – STIP, időtúllépés, ATM/kapcsolati hiba, host válaszidő.
+4. **ATM-enkénti forgalom** – figyelendő ATM-ek (sok hiba, elnyelt kártya, magas elutasítás,
+   elhallgatott ATM), majd minden ATM: darab, elutasítás, felvét, kifizetett összeg,
+   kazettaműveletek, utolsó tranzakció ideje.
+5. **Melléklet** – sztornó (0420) és korrekció (5400) okok.
+
+```
+RUN TLFRPT -d 5 $DATA.TLF.TL261114                 == diagnosztika
+RUN TLFRPT /OUT $S.#TLFRPT/ $DATA.TLF.TL261114     == riport
+```
+
+Opciók: `-a nn` (első elutasító ok-kód, alap 50; a 90–92 mindig engedélyezett),
+`-r fájl` (megnevezések felülírása), `-z perc`, `-d n`.
+A diagnosztika és a riport sem ír ki kártyaszámot, számlaszámot vagy egyenleget.
+
+Feltételezések: saját kártya = `CRD.FIID` = `TERM.FIID`; nettó kifizetés = engedélyezett
+felvét − sztornózott (0420: `AMT-1 − AMT-2`) + korrekció (5400: `AMT-2 − AMT-1`).
+Mezőpozíciók: BASE24-atm Release 6.0 DDL, HEAD 76, AUTH 398 bájt.
+
+Teszt: `python3 test/gen_tlf.py /tmp/tl.dat && gcc -o /tmp/tlfrpt tlfrpt.c && /tmp/tlfrpt -z 60 /tmp/tl.dat`
