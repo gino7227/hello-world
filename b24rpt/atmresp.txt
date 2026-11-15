@@ -1,0 +1,44 @@
+# Valaszkod-megnevezesek - BASE24-atm (TLF), a kesobbi ATM riporthoz
+# Formatum: soronkent "nnn megnevezes", nnn = AUTH.RESP-CDE (3 jegy)
+# Megj.: a 090-092 engedelyezo kodok, ezeket az ATM riport kulon kezeli.
+000 Approved with balances
+001 Approved - no balances
+050 Unauthorized usage
+051 Expired card
+052 Invalid card
+053 Invalid PIN
+054 Database problem
+055 Ineligible transaction
+056 Ineligible account
+057 Transaction not supported
+058 Insufficient funds with no amount 3
+059 Insufficient funds with amount 3
+060 Uses limit exceeded
+061 Withdrawal limit would be exceeded
+062 PIN tries exceeded
+063 Withdrawal limit already reached
+064 Invalid credit card cash advance
+065 No statement information
+066 Statement information not available
+067 Invalid cash back amount
+068 External decline
+069 No sharing arrangement
+070 System error
+071 Contact card issuer
+072 Destination not available
+073 Routing look up problem
+074 Message edit error
+081 Security module parameter error
+082 Security module failure
+083 KEYI record not found
+084 ATC check failure
+085 CVR decline
+086 TVR decline
+087 Request cryptogram failure
+088 Fallback decline
+090 Approved transaction inside window
+091 Approved transaction outside window
+092 Approved (balance anytime)
+150 Unauthorized usage (capture card)
+151 Expired card (capture card)
+162 PIN tries exceeded (capture card)

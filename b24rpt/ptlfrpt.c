@@ -654,7 +654,7 @@ static int cmp_code(const void *a, const void *b)
 
 static void resp_table(int approved)
 {
-  int idx[1000], n = 0, i, k, used[NDEC]; long tot = 0;
+  int idx[1000], n = 0, i, k, used[NDEC], nused = 0, dw; long tot = 0;
   char a[32], b[32], c[16];
   for (k = 0; k < NDEC; k++) used[k] = 0;
   for (i = 0; i < 1000; i++) {
@@ -666,15 +666,20 @@ static void resp_table(int approved)
   }
   if (!n) { printf("  nincs\n"); return; }
   qsort(idx, n, sizeof(int), cmp_code);
-  /* csak azok a dontes-oszlopok jelennek meg, amelyekben van adat */
-  printf("%-4s%-20s%8s%8s", "Kod", "Megnevezes", "Darab", "Arany");
+  /* csak azok a dontes-oszlopok jelennek meg, amelyekben van adat;
+     a megnevezes oszlop a maradek helyet kapja (max. RPT_W szelesseg) */
+  for (k = 0; k < NDEC; k++) if (used[k]) nused++;
+  dw = RPT_W - 4 - 17 - nused * 7;
+  if (dw > 45) dw = 45;
+  if (dw < 12) dw = 12;
+  printf("%-4s%-*s%8s%9s", "Kod", dw, "Megnevezes", "Darab", "Arany");
   for (k = 0; k < NDEC; k++) if (used[k]) printf("%7s", dec_name[k]);
   printf("\n");
   line(RPT_W, '-');
   for (i = 0; i < n; i++) {
-    int code = idx[i]; char desc[21];
-    strncpy(desc, resp_desc[code] ? resp_desc[code] : "", 19); desc[19] = 0;
-    printf("%03d %-20s%8s%8s", code, desc, fmt_n(g_sort_tot[code], a), pct(g_sort_tot[code], tot, b));
+    int code = idx[i]; char desc[64];
+    strncpy(desc, resp_desc[code] ? resp_desc[code] : "", (size_t)(dw - 1)); desc[dw - 1] = 0;
+    printf("%03d %-*s%8s%9s", code, dw, desc, fmt_n(g_sort_tot[code], a), pct(g_sort_tot[code], tot, b));
     for (k = 0; k < NDEC; k++) {
       if (!used[k]) continue;
       if (resp_cnt[code][k]) fmt_n(resp_cnt[code][k], c); else strcpy(c, "-");
@@ -683,7 +688,7 @@ static void resp_table(int approved)
     printf("\n");
   }
   line(RPT_W, '-');
-  printf("    %-20s%8s\n", "OSSZESEN", fmt_n(tot, a));
+  printf("    %-*s%8s\n", dw, "OSSZESEN", fmt_n(tot, a));
 }
 
 static void report_resp(void)

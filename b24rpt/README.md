@@ -33,7 +33,7 @@ RUN PTLFRPT /OUT $S.#PTLFRPT/ -h BICI -r $DATA.B24RPT.RESPDESC $DATA.PTLF.PO2611
 |---|---|
 | `-a nnn` | Az első **elutasító** válaszkód (alap: `050`); ennél kisebb = engedélyezett |
 | `-c XX` | Hazai országkód a belföld/külföld bontáshoz (alap: `HU`) |
-| `-r fájl` | Válaszkód-megnevezések (`respdesc.txt` minta) |
+| `-r fájl` | Válaszkód-megnevezések (`respdesc.txt`: a BASE24-pos kódok listája) |
 | `-h dest` | A saját host `DEST` neve (pl. `BICI`), ha a host interchange interfészen át kapcsolódik: `RESPONDER` 6/7 és ez a `DEST` → Host |
 | `-z perc` | Időeltolás GMT-hez képest percben (alap: a rendszer helyi ideje) |
 | `-d n` | Diagnosztika: az első *n* tranzakció mezőinek kiírása (kártyaadat nélkül) |
@@ -52,6 +52,10 @@ Ha valami elcsúszott, a DDL eltérhet a Release 6.0-tól; ilyenkor küldd el a 
 - **Időpont:** `HEAD.DAT-TIM` (rendszeridő), nem a terminál helyi ideje.
 - **Válaszidő:** `RE-ENTRY-TIM − EXIT-TIM` (a host válaszideje a Host Interface szerint).
 - A mezőpozíciók a BASE24-pos Release 6.0 DDL-jéből számolva: HEAD 172, AUTH 614 bájt.
+
+## Válaszkód-fájlok
+- `respdesc.txt` – BASE24-pos (PTLF) válaszkódok, ékezet nélkül. EDIT fájlként töltsd fel, és add meg `-r`-rel.
+- `atmresp.txt` – BASE24-atm (TLF) válaszkódok a későbbi ATM riporthoz.
 
 ## Teszt (nem NonStop gépen)
 ```

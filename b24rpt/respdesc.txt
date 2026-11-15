@@ -1,8 +1,126 @@
-# PTLFRPT valaszkod-megnevezesek
-# Formatum: soronkent "nnn megnevezes" (nnn = AUTH.RESP-CDE, 3 jegy)
-# A kodokat a BASE24-pos Transaction Processing Manual alapjan toltsd ki.
-# Csak ASCII karaktert hasznalj (ekezet nelkul). Max. 29 karakter jelenik meg.
-#
-# Pelda (a kodok csak mintak, ellenorizd a sajat listatokkal!):
-# 000 Engedelyezve
-# 051 Fedezethiany
+# PTLFRPT valaszkod-megnevezesek - BASE24-pos (POS)
+# Formatum: soronkent "nnn megnevezes", nnn = AUTH.RESP-CDE (3 jegy)
+# Csak ASCII karakter (ekezet nelkul). # = megjegyzes.
+# Engedelyezett: 000-049 (PTLFRPT -a 050, ez az alapertelmezes).
+# Megj.: a 952-954 (approved admin request) kodokat a riport
+# elutasitottnak szamolja, mert 050 felett vannak.
+000 Elfogadva, egyenleginformacioval
+001 Elfogadva, egyenleginfo nelkul
+003 Elfogadva, tovabbi azonositassal
+004 Elfogadva, alairt bizonylattal
+050 Nem engedelyezett hasznalat
+051 Lejart kartya
+052 Tul sok rontott PIN
+053 Nem megfelelo admin kartyahasznalat
+054 Az Atalla nem elerheto
+055 Nem engedelyezett tranzakciotipus
+056 Nem tamogatott tranzakciotipus
+057 Lopott, vesztett kartya
+058 Nem ervenyes kartya, vagy egyeb hiba
+059 Kartya/szamlahasznalati korlat
+060 Ismeretlen kartya (nincs a CAF-ben)
+061 Ismeretlen szamla (nincs a PBF-ben)
+062 PBF irasi hiba
+063 Ervenytelen authorizacios kiserlet
+064 Hibas a leolvasott TRACK adat
+065 Nem engedelyezett tranzakciotipus
+066 Nem engedelyezett osszeg (hitelk.)
+067 Ervenytelen tranzakcio datum
+068 PTLF irasi hiba
+069 Adathiba
+070 Base24 (IDF) konfiguracios hiba
+071 Authorizacio nem tovabbithato
+072 Kartya a tiltolistan (NEG)
+073 Base24 konfiguracios hiba
+074 Egyeb hiba
+075 Kartyaszam tul rovid/hosszu
+076 Nincs fedezet
+077 Tul sok eloauthorizacio
+078 Duplikalt tranzakcio
+079 Aruvisszavet limittullepes
+080 Aruvisszavet limittullepes
+081 Aruvisszavet osszegtullepes
+082 Hasznalati limittullepes
+083 Aruvisszavet osszegtullepes
+084 Kartyabirtokos keresere tiltva
+085 Egyenlegkeres nem engedelyezett
+086 Floor limit felett, kibocsato n.e.
+087 Aruvisszavet limittullepes
+088 Telefonos engedelyezes (referral)
+089 Inaktiv vagy zarolt kartya
+090 Referral fajl megtelt
+101 Kibocsatot hivni
+107 Vasarlasi limit felett
+113 Timelimit
+115 Transaction log file full
+120 Usage accumulation data problem
+121 Administrative card data problem
+122 PIN nem ellenorizheto (HSM n.e.)
+130 ARQC referral
+131 CVR referral
+132 TVR referral
+133 Reason online code referral
+134 Fallback referral
+150 Merchant not on file
+200 Ervenytelen szamla (invalid account)
+201 Rossz PIN
+202 Cash advance less than minimum
+203 Administrative card needed
+204 Kisebb osszeg (CAF/kereskedo limit)
+205 Invalid advance amount
+206 Cardholder auth. data not found
+207 Invalid transaction date
+208 Invalid expiration date
+209 Invalid transaction code
+251 Cash back exceeds daily limit
+400 ARQC failure
+401 HSM parameter error
+402 HSM failure
+403 ICC key information not found
+404 ATC check failure
+405 CVR decline
+406 TVR decline
+407 Reason online code decline
+408 Fallback decline
+800 Format error
+801 Invalid data
+802 Invalid employee number
+809 Invalid close transaction
+810 Transaction timeout
+811 System error
+820 Invalid terminal identifier
+821 Invalid response length
+870 Mail delivered
+871 Mail stored
+880 Mail/download received completely
+881 Mail/download received, more data
+882 Download aborted (call for service)
+889 KMAC synchronization error
+898 Invalid MAC
+899 Sequence error - resync
+900 Number of PIN tries exceeded
+901 Expired card
+902 Negative card file capture code
+903 Card status is 3 (stolen)
+904 Advance less than minimum
+905 Number times used exceeded
+906 Delinquent
+907 Over limit table
+908 Amount over maximum
+909 Capture
+910 ARQC capture
+911 CVR capture
+912 TVR capture
+950 Administrative card not found
+951 Administrative card not allowed
+952 Approved admin request - in window
+953 Approved admin req. - out of window
+954 Approved admin request - anytime
+955 Chargeback - customer file updated
+956 Chargeback - file upd., no acquirer
+957 Chargeback - incorrect prefix number
+958 Chargeback - bad resp.code/prefix
+959 Admin transactions not supported
+960 Chargeback - appr., file not upd.
+961 Chargeback - appr., no acquirer
+962 Chargeback - accepted, wrong dest.
