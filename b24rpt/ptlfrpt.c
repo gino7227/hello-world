@@ -13,7 +13,9 @@
  *
  *   -a nnn     elso ELUTASITO valaszkod (alap: 050; ennel kisebb = engedelyezett)
  *   -c XX      hazai orszagkod (alap: HU) a belfold/kulfold bontashoz
- *   -r fajl    valaszkod-megnevezesek ("nnn szoveg" soronkent, # = megjegyzes)
+ *   -r fajl    valaszkod-megnevezesek felulirasa/kiegeszitese ("nnn szoveg"
+ *              soronkent, # = megjegyzes). A BASE24-pos kodok be vannak
+ *              epitve, ez az opcio csak eltereshez kell.
  *   -z perc    idoeltolas GMT-hez kepest percben (alap Guardianon: a rendszer
  *              helyi ideje; mashol: 0)
  *   -h nev     a sajat host DEST neve (pl. BICI), ha a host interchange
@@ -335,6 +337,138 @@ static void rd_close(void) { if (rf) fclose(rf); }
 #endif
 
 /* ---------- Valaszkod-megnevezesek ---------- */
+/* Beepitett BASE24-pos valaszkod-megnevezesek (a -r fajl felulirhatja) */
+static const struct { int code; const char *desc; } resp_builtin[] = {
+  {  0, "Elfogadva, egyenleginformacioval"},
+  {  1, "Elfogadva, egyenleginfo nelkul"},
+  {  3, "Elfogadva, tovabbi azonositassal"},
+  {  4, "Elfogadva, alairt bizonylattal"},
+  { 50, "Nem engedelyezett hasznalat"},
+  { 51, "Lejart kartya"},
+  { 52, "Tul sok rontott PIN"},
+  { 53, "Nem megfelelo admin kartyahasznalat"},
+  { 54, "Az Atalla nem elerheto"},
+  { 55, "Nem engedelyezett tranzakciotipus"},
+  { 56, "Nem tamogatott tranzakciotipus"},
+  { 57, "Lopott, vesztett kartya"},
+  { 58, "Nem ervenyes kartya, vagy egyeb hiba"},
+  { 59, "Kartya/szamlahasznalati korlat"},
+  { 60, "Ismeretlen kartya (nincs a CAF-ben)"},
+  { 61, "Ismeretlen szamla (nincs a PBF-ben)"},
+  { 62, "PBF irasi hiba"},
+  { 63, "Ervenytelen authorizacios kiserlet"},
+  { 64, "Hibas a leolvasott TRACK adat"},
+  { 65, "Nem engedelyezett tranzakciotipus"},
+  { 66, "Nem engedelyezett osszeg (hitelk.)"},
+  { 67, "Ervenytelen tranzakcio datum"},
+  { 68, "PTLF irasi hiba"},
+  { 69, "Adathiba"},
+  { 70, "Base24 (IDF) konfiguracios hiba"},
+  { 71, "Authorizacio nem tovabbithato"},
+  { 72, "Kartya a tiltolistan (NEG)"},
+  { 73, "Base24 konfiguracios hiba"},
+  { 74, "Egyeb hiba"},
+  { 75, "Kartyaszam tul rovid/hosszu"},
+  { 76, "Nincs fedezet"},
+  { 77, "Tul sok eloauthorizacio"},
+  { 78, "Duplikalt tranzakcio"},
+  { 79, "Aruvisszavet limittullepes"},
+  { 80, "Aruvisszavet limittullepes"},
+  { 81, "Aruvisszavet osszegtullepes"},
+  { 82, "Hasznalati limittullepes"},
+  { 83, "Aruvisszavet osszegtullepes"},
+  { 84, "Kartyabirtokos keresere tiltva"},
+  { 85, "Egyenlegkeres nem engedelyezett"},
+  { 86, "Floor limit felett, kibocsato n.e."},
+  { 87, "Aruvisszavet limittullepes"},
+  { 88, "Telefonos engedelyezes (referral)"},
+  { 89, "Inaktiv vagy zarolt kartya"},
+  { 90, "Referral fajl megtelt"},
+  {101, "Kibocsatot hivni"},
+  {107, "Vasarlasi limit felett"},
+  {113, "Timelimit"},
+  {115, "Transaction log file full"},
+  {120, "Usage accumulation data problem"},
+  {121, "Administrative card data problem"},
+  {122, "PIN nem ellenorizheto (HSM n.e.)"},
+  {130, "ARQC referral"},
+  {131, "CVR referral"},
+  {132, "TVR referral"},
+  {133, "Reason online code referral"},
+  {134, "Fallback referral"},
+  {150, "Merchant not on file"},
+  {200, "Ervenytelen szamla (invalid account)"},
+  {201, "Rossz PIN"},
+  {202, "Cash advance less than minimum"},
+  {203, "Administrative card needed"},
+  {204, "Kisebb osszeg (CAF/kereskedo limit)"},
+  {205, "Invalid advance amount"},
+  {206, "Cardholder auth. data not found"},
+  {207, "Invalid transaction date"},
+  {208, "Invalid expiration date"},
+  {209, "Invalid transaction code"},
+  {251, "Cash back exceeds daily limit"},
+  {400, "ARQC failure"},
+  {401, "HSM parameter error"},
+  {402, "HSM failure"},
+  {403, "ICC key information not found"},
+  {404, "ATC check failure"},
+  {405, "CVR decline"},
+  {406, "TVR decline"},
+  {407, "Reason online code decline"},
+  {408, "Fallback decline"},
+  {800, "Format error"},
+  {801, "Invalid data"},
+  {802, "Invalid employee number"},
+  {809, "Invalid close transaction"},
+  {810, "Transaction timeout"},
+  {811, "System error"},
+  {820, "Invalid terminal identifier"},
+  {821, "Invalid response length"},
+  {870, "Mail delivered"},
+  {871, "Mail stored"},
+  {880, "Mail/download received completely"},
+  {881, "Mail/download received, more data"},
+  {882, "Download aborted (call for service)"},
+  {889, "KMAC synchronization error"},
+  {898, "Invalid MAC"},
+  {899, "Sequence error - resync"},
+  {900, "Number of PIN tries exceeded"},
+  {901, "Expired card"},
+  {902, "Negative card file capture code"},
+  {903, "Card status is 3 (stolen)"},
+  {904, "Advance less than minimum"},
+  {905, "Number times used exceeded"},
+  {906, "Delinquent"},
+  {907, "Over limit table"},
+  {908, "Amount over maximum"},
+  {909, "Capture"},
+  {910, "ARQC capture"},
+  {911, "CVR capture"},
+  {912, "TVR capture"},
+  {950, "Administrative card not found"},
+  {951, "Administrative card not allowed"},
+  {952, "Approved admin request - in window"},
+  {953, "Approved admin req. - out of window"},
+  {954, "Approved admin request - anytime"},
+  {955, "Chargeback - customer file updated"},
+  {956, "Chargeback - file upd., no acquirer"},
+  {957, "Chargeback - incorrect prefix number"},
+  {958, "Chargeback - bad resp.code/prefix"},
+  {959, "Admin transactions not supported"},
+  {960, "Chargeback - appr., file not upd."},
+  {961, "Chargeback - appr., no acquirer"},
+  {962, "Chargeback - accepted, wrong dest."},
+  {-1, NULL}
+};
+
+static void load_builtin_resp(void)
+{
+  int i;
+  for (i = 0; resp_builtin[i].desc; i++)
+    resp_desc[resp_builtin[i].code] = (char *)resp_builtin[i].desc;
+}
+
 static void load_resp(const char *fn)
 {
   FILE *f = fopen(fn, "r"); char line[256];
@@ -347,8 +481,7 @@ static void load_resp(const char *fn)
     if (e == p || c < 0 || c > 999) continue;
     while (*e == ' ' || *e == '\t') e++;
     e[strcspn(e, "\r\n")] = 0;
-    free(resp_desc[c]);
-    resp_desc[c] = (char *)malloc(strlen(e) + 1);
+    resp_desc[c] = (char *)malloc(strlen(e) + 1);   /* felulirja a beepitettet */
     if (resp_desc[c]) strcpy(resp_desc[c], e);
   }
   fclose(f);
@@ -862,6 +995,7 @@ int main(int argc, char *argv[])
     else usage();
   }
   if (!opt_file) usage();
+  load_builtin_resp();
   if (opt_respfile) load_resp(opt_respfile);
 
   if (rd_open(opt_file)) return 1;
