@@ -33,6 +33,7 @@
 #include <cextdecs(FILE_OPEN_,READX,WRITEX,FILE_GETINFO_,FILE_CLOSE_)>
 #endif
 
+#define TCPRATE_VER "2026-11-16 v5 (tordeles-turo)"
 #define MAXLINE   8192
 #define MAXCONN   2000
 #define MAXPEER   200
@@ -604,6 +605,7 @@ static int mode_once(int argc, char *argv[])
     if (st.gone) printf("Megjegyzes: %d kapcsolat megszunt a meres alatt\n", st.gone);
   }
   if (st.nw) printf("Megjegyzes: %d uj kapcsolat jott letre a meres alatt\n", st.nw);
+  printf("(TCPRATE %s)\n", TCPRATE_VER);
   if (!detail) return 0;
 
   printf("\nReszletek (Be/Ki = adatszegmens/mp; kis uzeneteknel 1 szegmens ~ 1 uzenet)\n");
@@ -662,6 +664,7 @@ int main(int argc, char *argv[])
   if (argc >= 2 && !strcmp(argv[1], "L")) return mode_log(argc, argv);
   if (argc >= 2 && !strcmp(argv[1], "D")) return mode_daily(argc, argv);
   if (argc < 2) {
+    fprintf(stderr, "TCPRATE %s\n", TCPRATE_VER);
     fprintf(stderr, "Hasznalat: TCPRATE port [mp] [R]\n"
                     "           TCPRATE L naplo port:nev [port:nev ...]\n"
                     "           TCPRATE D naplo\n");
