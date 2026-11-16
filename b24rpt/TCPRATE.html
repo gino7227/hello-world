@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>TCPRATE</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">TCPRATE</h1>
+</header>
+<h1 id="tcprate--tcp-portok-forgalmának-mérése-a-clim-eken">TCPRATE –
+TCP-portok forgalmának mérése a CLIM-eken</h1>
+<h2 id="1-cél">1. Cél</h2>
+<p>A TCPRATE megmutatja, hány üzenet ment át egy adott TCP-porton (pl.
+HSM: 7000, ATM: 4275) egy mérési időszak alatt, hány kapcsolat él,
+hogyan oszlik meg a forgalom a túloldali gépek között, és van-e jele
+hálózati vagy alkalmazás-oldali problémának.</p>
+<p>Két módon használható:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Mód</th>
+<th>Mire</th>
+<th>Hogyan</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Kézi mérés</strong></td>
+<td>„Mennyi forgalom megy most a 7000-es porton?”</td>
+<td><code>TCPRATE 7000 5</code> TACL-ből</td>
+</tr>
+<tr class="even">
+<td><strong>Folyamatos naplózás</strong></td>
+<td>„Mennyi volt tegnap óránként?”</td>
+<td>a <code>DAILYLOOP</code> 5 percenként mér, a <code>DAILYRPT</code>
+reggel órás riportot készít</td>
+</tr>
+</tbody>
+</table>
+<h2 id="2-működési-elv">2. Működési elv</h2>
+<h3 id="21-honnan-jön-az-adat">2.1 Honnan jön az adat</h3>
+<p>NonStop X rendszeren a TCP/IP protokollkezelés a CLIM-eken (Linux)
+fut. Az alkalmazások (BASE24) kapcsolatai a CLIM-en, egy-egy
+<strong>hálózati névtérben</strong> (network namespace, pl.
+<code>NMLNS005</code>, <code>NMLNS006</code>) láthatók. A TCPRATE ezeket
+a Linux <code>ss -tin</code> paranccsal kérdezi le, a
+<code>climcmd</code> segítségével:</p>
+<pre><code>climcmd &lt;clim&gt; ip netns exec &lt;névtér&gt; ss -tin dport = :&lt;port&gt; or sport = :&lt;port&gt;</code></pre>
+<ul>
+<li><code>-t</code>: csak TCP; <code>-i</code>: kapcsolatonkénti
+részletes számlálók; <code>-n</code>: IP-címek és portok névfeloldás
+nélkül.</li>
+<li>A szűrő mindkét irányt nézi (<code>dport</code> és
+<code>sport</code>), így mindegy, hogy a NonStop a kliens (pl. HSM) vagy
+a szerver (pl. ATM-koncentrátor).</li>
+<li>A névtér nélküli <code>ss</code> csak a CLIM
+menedzsment-kapcsolatait mutatja (SSH a 22-es porton), az
+alkalmazás-forgalmat nem.</li>
+</ul>
+<h3 id="22-mit-számol">2.2 Mit számol</h3>
+<p>Az <code>ss -tin</code> kapcsolatonként a <strong>kapcsolat
+felépülése óta összesített</strong> számlálókat adja. A TCPRATE ezek
+közül ezeket használja:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Számláló</th>
+<th>Jelentés</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>data_segs_in</code></td>
+<td>adatot tartalmazó beérkezett TCP-szegmensek (a NonStop felé)</td>
+</tr>
+<tr class="even">
+<td><code>data_segs_out</code></td>
+<td>adatot tartalmazó elküldött TCP-szegmensek (a NonStopról)</td>
+</tr>
+<tr class="odd">
+<td><code>bytes_received</code> / <code>bytes_sent</code></td>
+<td>bájtok</td>
+</tr>
+<tr class="even">
+<td><code>bytes_retrans</code></td>
+<td>újraküldött bájtok</td>
+</tr>
+<tr class="odd">
+<td><code>rtt</code>, <code>minrtt</code></td>
+<td>oda-vissza idő (ms)</td>
+</tr>
+<tr class="even">
+<td><code>lastrcv</code></td>
+<td>ms az utolsó fogadás óta</td>
+</tr>
+<tr class="odd">
+<td><code>Send-Q</code></td>
+<td>elküldött, de még nem nyugtázott bájtok</td>
+</tr>
+</tbody>
+</table>
+<p>Mivel a számlálók összesítettek, <strong>egy lekérdezésből nem lehet
+sebességet számolni</strong>. A TCPRATE ezért két pillanatképet készít a
+mérési idő különbséggel, és a kettő különbségét számolja:</p>
+<pre><code>üzenetek a mérés alatt  =  data_segs_in(2. kép)  − data_segs_in(1. kép)
+üzenet / mp            =  különbség / mérési idő (mp)</code></pre>
+<p><strong>Üzenet ≈ szegmens:</strong> kis, kérés–válasz jellegű
+üzeneteknél (HSM-parancs, ATM-üzenet, néhány száz bájt) egy
+alkalmazás-üzenet általában egy TCP-szegmens. Nagy üzenet több
+szegmensre is szétoszolhat, illetve több kis üzenet kerülhet egy
+szegmensbe, ezért ez közelítő érték.</p>
+<h3 id="23-korlátok">2.3 Korlátok</h3>
+<ul>
+<li><strong>Visszamenőleg nem mér.</strong> A CLIM nem tárol előzményt;
+a kézi mérés <em>most indul</em> és a megadott ideig tart. Előzményt a
+<code>DAILYLOOP</code> folyamatos naplózása ad (lásd 6. fejezet).</li>
+<li><strong>Megszűnt kapcsolat</strong> forgalma a mérés alatt nem
+számolható (a második pillanatképben már nincs meg). Jelzés:
+<code>MSZ</code>.</li>
+<li><strong>Közben létrejött kapcsolat</strong> teljes forgalma
+beleszámít (a mérés alatt keletkezett). Jelzés: <code>UJ</code>.</li>
+<li><strong>Visszaugró számláló</strong> (pl. ugyanazzal a porttal
+újraépült kapcsolat) 0-nak számít, hogy ne jöjjön ki negatív vagy
+értelmetlen érték.</li>
+</ul>
+<h2 id="3-felépítés">3. Felépítés</h2>
+<pre><code>TCPRATE makró (TACL)                         TCPRATE program (C)
+──────────────────────                       ───────────────────
+1. CLIM-ek névtereinek felderítése
+   (climcmd … ip netns list)
+2. 1. pillanatkép: CLIM/névtér páronként
+   climcmd … ss -tin  →  munkafájl CT1kk
+3. várakozás (mérési idő)
+4. 2. pillanatkép  →  munkafájl CT2kk
+5. vezérlő adatok (@@T, @@D, @@S, @@F)  ──►  munkafájlok beolvasása,
+   átadása:  RUN TCPRATE /INV …/                 kapcsolatok párosítása,
+                                                 különbségek, riport</code></pre>
+<h3 id="31-fájlok">3.1 Fájlok</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Fájl</th>
+<th>Tartalom</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>tcprate.tacl</code></td>
+<td>TACL makrókönyvtár: <code>TCPRATE</code> (fő makró),
+<code>CLIMV</code>, <code>CLIMF</code> (segédmakrók)</td>
+</tr>
+<tr class="even">
+<td><code>tcprate.c</code></td>
+<td>C program (<code>TCPRATE</code>), három üzemmód: egyszeri mérés,
+naplósor írása (L), napi riport (D)</td>
+</tr>
+<tr class="odd">
+<td><code>napi.tacl</code></td>
+<td>a napi automatizmus: <code>DAILYLOOP</code> 5 perces mérés,
+<code>DAILYRPT</code> órás riport</td>
+</tr>
+</tbody>
+</table>
+<h3 id="32-segédmakrók">3.2 Segédmakrók</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Makró</th>
+<th>Feladat</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>CLIMV változó clim parancs…</code></td>
+<td>rövid <code>climcmd</code> kimenet (pl. névtérlista) beolvasása
+TACL-változóba (munkafájl + <code>FUP COPY</code>)</td>
+</tr>
+<tr class="even">
+<td><code>CLIMF fájl clim parancs…</code></td>
+<td><code>climcmd</code> kimenet munkafájlba; ezt a TCPRATE program
+olvassa be közvetlenül</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Miért nem közvetlenül változóba?</strong></p>
+<ul>
+<li>A <code>climcmd</code> nem tud TACL-változóba írni
+(<code>/OUTV/</code>): <em>„Error: Filename must be specified with OUT
+run-option.”</em> Csak fájlnévvel megadott OUT-ba ír.</li>
+<li>A <code>FUP COPY</code> a hosszú rekordok végét levágja, ezért az
+<code>ss -tin</code> hosszú soraihoz nem használható (a levágás miatt
+kulcsok és értékek vesztek el). A hosszú kimenetet ezért a C program
+olvassa be a fájlból, teljes rekordhosszal.</li>
+</ul>
+<h3 id="33-a-munkafájl-formátuma">3.3 A munkafájl formátuma</h3>
+<p>A <code>climcmd</code> a hosszú sorokat fix hosszú rekordokra vágja,
+akár szó vagy szám közepén is (pl. <code>…da</code> |
+<code>ta_segs_out:2967122</code>), és a rekordvégi szóközök elvesznek. A
+TCPRATE program ezért:</p>
+<ul>
+<li>új kapcsolatnak veszi az állapot-szóval (<code>ESTAB</code>,
+<code>TIME-WAIT</code> stb.) kezdődő sort;</li>
+<li>a nem szóközzel kezdődő sort az előző rekord folytatásának tekinti,
+és elválasztó nélkül hozzáragasztja;</li>
+<li>a kulcsokat (<code>data_segs_in:</code> stb.) szövegkereséssel
+keresi a kapcsolat összefűzött szövegében.</li>
+</ul>
+<h2 id="4-telepítés">4. Telepítés</h2>
+<ol type="1">
+<li><strong>Program fordítása:</strong> a <code>tcprate.c</code>
+feltöltése EDIT fájlként (pl. <code>TCPRATEC</code>), majd fordítás a
+szokásos módon (pl.
+<code>CCOMP /IN TCPRATEC/ TCPRATE; RUNNABLE, SYSTYPE GUARDIAN</code>).</li>
+<li><strong>Makró feltöltése:</strong> a <code>tcprate.tacl</code> EDIT
+fájlként (pl. <code>TCPRMAC</code>).</li>
+<li><strong>Beállítások</strong> a makró elején (BEÁLLÍTÁSOK rész):</li>
+</ol>
+<table>
+<thead>
+<tr class="header">
+<th>Változó</th>
+<th>Példa</th>
+<th>Jelentés</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>clims</code></td>
+<td><code>nclim000 nclim001</code></td>
+<td>a CLIM-ek neve, szóközzel elválasztva</td>
+</tr>
+<tr class="even">
+<td><code>prog</code></td>
+<td><code>$DSMSCM.GINO.TCPRATE</code></td>
+<td>a lefordított program</td>
+</tr>
+<tr class="odd">
+<td><code>climv^tmp</code></td>
+<td><code>$DSMSCM.GINO.CLIMTMP</code></td>
+<td>munkafájl a rövid <code>climcmd</code> kimenetekhez</td>
+</tr>
+<tr class="even">
+<td><code>climv^sv</code></td>
+<td><code>$DSMSCM.GINO</code></td>
+<td>alkötet a <code>CTpkk</code> munkafájloknak</td>
+</tr>
+</tbody>
+</table>
+<ol start="4" type="1">
+<li><strong>Ellenőrzés:</strong> a riport utolsó sorában a programverzió
+látszik, pl. <code>(TCPRATE 2026-11-16 v6 (munkafajl))</code>. Ha
+hiányzik vagy régebbi, nem a legutóbb fordított program fut.</li>
+</ol>
+<h2 id="5-kézi-mérés">5. Kézi mérés</h2>
+<h3 id="51-használat">5.1 Használat</h3>
+<pre><code>LOAD /KEEP 1/ $DSMSCM.GINO.TCPRMAC
+TCPRATE port [perc] [névtér] [R]</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th>Paraméter</th>
+<th>Alapérték</th>
+<th>Jelentés</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>port</code></td>
+<td>– (kötelező)</td>
+<td>a figyelt port</td>
+</tr>
+<tr class="even">
+<td><code>perc</code></td>
+<td>5</td>
+<td>mérési idő percben; a makró ennyit vár</td>
+</tr>
+<tr class="odd">
+<td><code>névtér</code></td>
+<td><code>*</code></td>
+<td>adott névtér (pl. <code>NMLNS006</code>), vagy <code>*</code> = a
+CLIM-ek összes névtere</td>
+</tr>
+<tr class="even">
+<td><code>R</code></td>
+<td>–</td>
+<td>részletes kimenet kapcsolatonként</td>
+</tr>
+</tbody>
+</table>
+<p>Példák:</p>
+<pre><code>TCPRATE 7000 1               == HSM, 1 perc
+TCPRATE 4275                 == ATM, 5 perc
+TCPRATE 4275 10 * R          == ATM, 10 perc, részletesen
+TCPRATE 7000 5 NMLNS006      == HSM, 5 perc, adott névtér</code></pre>
+<h3 id="52-rövid-kimenet-alapértelmezés">5.2 Rövid kimenet
+(alapértelmezés)</h3>
+<pre><code>===============================================================================
+Port 7000 forgalma: 2026.11.16 15:53:47 - 15:54:55 (1,1 perc)
+===============================================================================
+Beerkezo uzenet (a NonStop fele):        1 082   (15,7 / mp)
+Kimeno uzenet (a NonStoprol):            1 082   (15,7 / mp)
+Kapcsolatok szama:                          16
+Megoszlas: 172.16.37.17 51%, 172.16.37.18 49%
+Allapot: rendben
+(TCPRATE 2026-11-16 v6 (munkafajl))</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th>Sor</th>
+<th>Jelentés</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Beérkező / Kimenő üzenet</td>
+<td>adatszegmensek száma a mérés alatt és másodpercenként</td>
+</tr>
+<tr class="even">
+<td>Kapcsolatok száma</td>
+<td>élő kapcsolatok a porton (az összes CLIM-en és névtérben)</td>
+</tr>
+<tr class="odd">
+<td>Megoszlás</td>
+<td>a forgalom (be + ki) aránya túloldali IP-címenként</td>
+</tr>
+<tr class="even">
+<td>Állapot</td>
+<td><code>rendben</code>, vagy figyelmeztető sorok (lásd 5.4)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="53-részletes-kimenet-r">5.3 Részletes kimenet
+(<code>R</code>)</h3>
+<p>Kapcsolatonként:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Oszlop</th>
+<th>Jelentés</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Tuloldal</td>
+<td>túloldali IP:port</td>
+</tr>
+<tr class="even">
+<td>Be/mp, Ki/mp</td>
+<td>adatszegmens/mp a mérés alatt</td>
+</tr>
+<tr class="odd">
+<td>rtt, minrtt</td>
+<td>átlagos és legkisebb oda-vissza idő (ms)</td>
+</tr>
+<tr class="even">
+<td>SendQ</td>
+<td>nyugtázatlan bájtok a mérés végén</td>
+</tr>
+<tr class="odd">
+<td>Utolso</td>
+<td>mp az utolsó fogadás óta</td>
+</tr>
+<tr class="even">
+<td>Retr</td>
+<td>a mérés alatt újraküldött bájtok</td>
+</tr>
+<tr class="odd">
+<td>Megj.</td>
+<td>jelzések (lásd 5.4)</td>
+</tr>
+</tbody>
+</table>
+<p>Ezen felül túloldali IP-cím szerinti összesítés (kapcsolatok,
+üzenetek, KB).</p>
+<h3 id="54-jelzések">5.4 Jelzések</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Kód</th>
+<th>Rövid kimenetben</th>
+<th>Jelentés</th>
+<th>Mire utal</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>SQ</code></td>
+<td>FIGYELEM</td>
+<td>Send-Q &gt; 0: nyugtázatlan adat áll sorban</td>
+<td>a túloldal lassú vagy nem fogad</td>
+</tr>
+<tr class="even">
+<td><code>CS</code></td>
+<td>FIGYELEM</td>
+<td>60 mp-nél régebben jött adat</td>
+<td>néma kapcsolat, a túloldal nem válaszol vagy nem kap forgalmat</td>
+</tr>
+<tr class="odd">
+<td><code>RT</code></td>
+<td>Megjegyzés</td>
+<td>újraküldés volt</td>
+<td>csomagvesztés a hálózaton</td>
+</tr>
+<tr class="even">
+<td><code>UJ</code></td>
+<td>Megjegyzés</td>
+<td>a kapcsolat a mérés alatt jött létre</td>
+<td>újracsatlakozás</td>
+</tr>
+<tr class="odd">
+<td><code>MSZ</code></td>
+<td>Megjegyzés</td>
+<td>a kapcsolat a mérés alatt megszűnt</td>
+<td>kapcsolatbontás, újraindítás</td>
+</tr>
+</tbody>
+</table>
+<h2 id="6-folyamatos-naplózás-és-órás-riport-napitacl">6. Folyamatos
+naplózás és órás riport (<code>napi.tacl</code>)</h2>
+<h3 id="61-5-percenkénti-mérés-dailyloop">6.1 5 percenkénti mérés
+(<code>DAILYLOOP</code>)</h3>
+<p>A háttérben futó <code>DAILYLOOP</code> (process <code>$NAPI</code>)
+5 percenként:</p>
+<ol type="1">
+<li>CLIM/névtér páronként <strong>egyetlen</strong>
+<code>climcmd</code>-dal lekérdezi az összes figyelt port
+kapcsolatait;</li>
+<li>az előző méréshez képest kiszámolja az 5 perc forgalmát
+(<code>TCPRATE L</code> üzemmód);</li>
+<li>portonként egy sort ír a napi naplóba:
+<code>&lt;napi^tclog&gt;.TCyymmdd</code> (entry-sequenced).</li>
+</ol>
+<p>Két munkafájl-készlet váltakozik (<code>CTAkk</code> és
+<code>CTBkk</code>), hogy az előző mérés fájljai a következő mérésig
+megmaradjanak. A névtereket induláskor és naponta egyszer felderíti.</p>
+<p>Beállítások a <code>napi^cfg</code> részben:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Változó</th>
+<th>Példa</th>
+<th>Jelentés</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>napi^ports</code></td>
+<td><code>4275:ATM 7000:HSM</code></td>
+<td>figyelt portok <code>port:név</code> alakban; üres = nincs
+mérés</td>
+</tr>
+<tr class="even">
+<td><code>napi^clims</code></td>
+<td><code>nclim000 nclim001</code></td>
+<td>CLIM-ek</td>
+</tr>
+<tr class="odd">
+<td><code>napi^tclog</code></td>
+<td><code>$DATA.EMSRPT</code></td>
+<td>a <code>TCyymmdd</code> naplók és a <code>CTA/CTB</code> munkafájlok
+helye</td>
+</tr>
+<tr class="even">
+<td><code>climv^tmp</code></td>
+<td><code>$DATA.EMSRPT.CLIMTMP</code></td>
+<td>munkafájl a rövid <code>climcmd</code> kimenetekhez</td>
+</tr>
+</tbody>
+</table>
+<h3 id="62-naplósor-formátuma">6.2 Naplósor formátuma</h3>
+<pre><code>2026-11-15 17:05:00 4275 ATM 300 18600 13950 12 0 0 0 0 0</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th>Mező</th>
+<th>Jelentés</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>dátum, idő</td>
+<td>a mérés vége (helyi idő)</td>
+</tr>
+<tr class="even">
+<td>port, név</td>
+<td>a figyelt port és neve</td>
+</tr>
+<tr class="odd">
+<td>mp</td>
+<td>a két mérés közti idő</td>
+</tr>
+<tr class="even">
+<td>be, ki</td>
+<td>adatszegmensek a két mérés között</td>
+</tr>
+<tr class="odd">
+<td>kapcs</td>
+<td>kapcsolatok száma</td>
+</tr>
+<tr class="even">
+<td>sq, cs, rt</td>
+<td>kapcsolatok száma Send-Q &gt; 0 / 60 mp-nél régebbi fogadás /
+újraküldés esetén</td>
+</tr>
+<tr class="odd">
+<td>megsz, uj</td>
+<td>megszűnt / új kapcsolatok</td>
+</tr>
+</tbody>
+</table>
+<h3 id="63-órás-riport-dailyrpt-tcprate-d">6.3 Órás riport
+(<code>DAILYRPT</code>, <code>TCPRATE D</code>)</h3>
+<p>A reggeli <code>DAILYRPT</code> a tegnapi naplóból riportot készít
+(<code>$S.#B24NAPI.TCP</code>), portonként:</p>
+<pre><code>Port 4275 (ATM)
+Ora        Be (db)    Ki (db)   Be/mp  Csucs Be/mp Kapcs  Figy Meres
+-------------------------------------------------------------------------------
+16-17      222 582    166 926    61,8         64,0     2     -    12
+17-18      224 276    168 198    62,3         64,0     2     -    12
+...
+Osszesen: 2 243 478 be, 1 682 450 ki, csucs 64,0 be/mp (17-18 ora)</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th>Oszlop</th>
+<th>Jelentés</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Be/Ki (db)</td>
+<td>üzenetek az órában</td>
+</tr>
+<tr class="even">
+<td>Be/mp</td>
+<td>óraátlag</td>
+</tr>
+<tr class="odd">
+<td>Csúcs Be/mp</td>
+<td>az óra legforgalmasabb 5 percének átlaga</td>
+</tr>
+<tr class="even">
+<td>Kapcs</td>
+<td>legtöbb kapcsolat az órában</td>
+</tr>
+<tr class="odd">
+<td>Figy</td>
+<td>hány mérésnél volt SQ, CS vagy megszűnt kapcsolat</td>
+</tr>
+<tr class="even">
+<td>Mérés</td>
+<td>5 perces mérések száma az órában (teljes óra: 12)</td>
+</tr>
+</tbody>
+</table>
+<p>Ha egy órában kevesebb mint 12 mérés van, a <code>DAILYLOOP</code>
+nem futott; a kimaradás utáni első mérés a kimaradt időszak teljes
+forgalmát az aktuális órához írja.</p>
+<h2 id="7-hibaelhárítás">7. Hibaelhárítás</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Tünet</th>
+<th>Ok</th>
+<th>Teendő</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>Error: Filename must be specified with OUT run-option.</code></td>
+<td>a <code>climcmd</code> nem tud változóba írni</td>
+<td>a <code>CLIMV</code> / <code>CLIMF</code> makrót kell használni
+(benne van a jelenlegi makróban)</td>
+</tr>
+<tr class="even">
+<td><code>FIGYELEM: nincs kapcsolat ezen a porton!</code></td>
+<td>rossz port, vagy a kapcsolatok más CLIM-en / névtérben vannak</td>
+<td><code>climcmd &lt;clim&gt; ip netns list</code>, majd kézzel:
+<code>climcmd &lt;clim&gt; ip netns exec &lt;ns&gt; ss -tin dport = :&lt;port&gt; or sport = :&lt;port&gt;</code></td>
+</tr>
+<tr class="odd">
+<td>Kimenő = 0, irreális bejövő érték</td>
+<td>régi programverzió (a hosszú rekordok rossz beolvasása)</td>
+<td>a riport utolsó sorában a verzió legyen legalább
+<code>v6</code></td>
+</tr>
+<tr class="even">
+<td>Hiányzó verziósor</td>
+<td>régi program fut</td>
+<td><code>FI TCP*</code>: a forrás és a program módosítási ideje
+friss-e; újrafordítás</td>
+</tr>
+<tr class="odd">
+<td>Egy túloldali cím 0%-on áll</td>
+<td>a cím felé nincs forgalom (pl. kiesett HSM)</td>
+<td><code>TCPRATE &lt;port&gt; 5 * R</code>: élnek-e a kapcsolatai,
+van-e <code>CS</code> jelzés</td>
+</tr>
+</tbody>
+</table>
+<h2 id="8-példa-hsm-kiesés-2026-november-16">8. Példa: HSM-kiesés (2026.
+november 16.)</h2>
+<p>A 172.16.37.17 HSM vasárnap kiesett, hétfő reggel újraindították.</p>
+<ul>
+<li>Az újraindítás előtt a teljes HSM-forgalmat a .18 vitte; kapcsolatai
+vasárnap óta ~2,97 millió kérést és választ számoltak.</li>
+<li>Az újraindítás után a .17 kapcsolatai újraépültek (kis összesített
+számlálók).</li>
+<li>A mérés délután:
+<code>Megoszlas: 172.16.37.17 51%, 172.16.37.18 49%</code>, bejövő =
+kimenő = 1 082 / 1,1 perc. A BASE24 mindkét HSM-et egyformán használja,
+minden kérésre jött válasz.</li>
+</ul>
+<p>Az 5 perces naplózás mellett az ilyen kiesés az órás riportban úgy
+látszik, hogy az egyik túloldali cím forgalma 0-ra esik, a másiké a
+duplájára nő.</p>
+<h2 id="9-verziótörténet">9. Verziótörténet</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Verzió</th>
+<th>Változás</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>v1</td>
+<td>kapcsolatonkénti részletes riport</td>
+</tr>
+<tr class="even">
+<td>v2</td>
+<td>rövid összefoglaló alapból, részletek <code>R</code>-rel; perc alapú
+mérési idő</td>
+</tr>
+<tr class="odd">
+<td>v3</td>
+<td><code>L</code> (naplósor) és <code>D</code> (napi riport) üzemmód a
+<code>DAILYLOOP</code>-hoz</td>
+</tr>
+<tr class="even">
+<td>v4</td>
+<td>a <code>climcmd</code> kimenete munkafájlon keresztül
+(<code>OUTV</code> nem támogatott)</td>
+</tr>
+<tr class="odd">
+<td>v5</td>
+<td>tördelés-tűrő beolvasás (szó közepén vágott rekordok)</td>
+</tr>
+<tr class="even">
+<td>v6</td>
+<td>a program maga olvassa a munkafájlokat (<code>@@F</code>), mert a
+<code>FUP COPY</code> levágta a hosszú rekordokat</td>
+</tr>
+</tbody>
+</table>
+</body>
+</html>
