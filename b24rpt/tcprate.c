@@ -127,15 +127,16 @@ static void blk_add(const char *s)
   if (blk[blk_n]) strcpy(blk[blk_n++], s);
 }
 
-/* kulcs keresese a kapcsolat osszefuzott szovegeben: a kulcs elott nem allhat
-   betu vagy '_' (pl. "rtt:" ne talalja meg a "minrtt:"-t), de szamjegy igen,
-   mert a tordeles miatt az elozo ertekhez ragadhat */
+/* kulcs keresese a kapcsolat osszefuzott szovegeben. A tordeles miatt a kulcs
+   az elozo szohoz ragadhat (pl. "18.1Mbpslastsnd:"), ezert csak az "rtt:"
+   kulcsnal tiltjuk a betu-elotagot (hogy ne a "minrtt:"-t talalja meg). */
 static const char *find_key(const char *buf, const char *key)
 {
   const char *p = buf;
   size_t n = strlen(key);
+  int guard = !strcmp(key, "rtt:");     /* "minrtt:", "rcv_rtt:" kizarasa */
   while ((p = strstr(p, key)) != NULL) {
-    if (p == buf || !(isalpha((unsigned char)p[-1]) || p[-1] == '_')) return p + n;
+    if (!guard || p == buf || !(isalpha((unsigned char)p[-1]) || p[-1] == '_')) return p + n;
     p += n;
   }
   return NULL;
@@ -190,49 +191,63 @@ static int count_words(const char *s)
      mind a 4 mezo (Recv-Q Send-Q Local Peer), a kovetkezo sor hozza ragad;
    - a kapcsolat tobbi sora elvalaszto nelkul osszefuzve (szokozzel kezdodo
      sor ele szokoz kerul), es a kulcsokat szovegkereses talalja meg. */
+/* van-e a szovegben ket ':'-ot tartalmazo szo (rosszul osszeragasztott cim) */
+static int bad_addr(const char *h)
+{
+  int colons = 0;
+  for (; *h; h++) {
+    if (isspace((unsigned char)*h)) colons = 0;
+    else if (*h == ':' && ++colons > 1) return 1;
+  }
+  return 0;
+}
+
 static void blk_flush(void)
 {
-  int i, j, wmax = 0, prevlen = 0;
+  int i, j;
   size_t tot = 1;
   char *info = NULL, *ip = NULL, first[32];
   Conn *c = NULL;
 
   if (!blk_n) return;
-  /* a tordelesi szelesseg: a blokk leghosszabb sora. Csak az ilyen hosszu
-     (tordeles altal elvagott) sort ragasztjuk elvalaszto nelkul a kovetkezohoz;
-     a rovidebb sor utan szokoz jon (a levagott sorvegi szokoz helyett). */
-  for (i = 0; i < blk_n; i++) {
-    int L = (int)strlen(blk[i]);
-    tot += (size_t)L + 2;
-    if (L > wmax) wmax = L;
-  }
+  for (i = 0; i < blk_n; i++) tot += strlen(blk[i]) + 2;
   info = (char *)malloc(tot);
   if (!info) { fprintf(stderr, "Keves memoria\n"); exit(1); }
 
+  /* Szabaly: a valodi ss kimenetben minden folytatosor szokozzel/tabbal
+     kezdodik. Ha egy sor nem igy kezdodik (es nem allapot-szo), akkor az
+     elozo sor folytatasa, amit a tordeles vagott el: elvalaszto nelkul
+     ragad hozza. */
   for (i = 0; i < blk_n; i++) {
     first_word(blk[i], first, sizeof first);
-    if (is_state(first)) {
+    if (is_state(first) && !isspace((unsigned char)blk[i][0])) {
       char hdr[1024], tmp[1024], *tok[6];
-      int nt, hlen;
+      int nt;
       if (c && ip) { *ip = 0; parse_info(c, cur_pass, info); }
       c = NULL;
       sprintf(hdr, "%.1000s", blk[i]);
-      hlen = (int)strlen(blk[i]);
-      /* a fejlecsor folytatasa: amig nincs meg mind a 4 mezo, vagy a sort a
-         tordeles vagta el, es a kovetkezo sor nem szokozzel/allapottal kezdodik */
       while (i + 1 < blk_n) {
         char f2[32];
-        int cont;
-        first_word(blk[i + 1], f2, sizeof f2);
-        if (is_state(f2)) break;
-        cont = count_words(hdr) < 5 ||
-               (hlen == wmax && !isspace((unsigned char)blk[i + 1][0]));
-        if (!cont) break;
-        i++;
-        if (hlen != wmax || isspace((unsigned char)blk[i][0]))
+        const char *nx = blk[i + 1];
+        first_word(nx, f2, sizeof f2);
+        if (is_state(f2) && !isspace((unsigned char)nx[0])) break;
+        if (isspace((unsigned char)nx[0])) {
+          /* szokozzel kezdodo sor: csak akkor a fejlec resze, ha meg hianyzik mezo */
+          if (count_words(hdr) >= 5) break;
           strncat(hdr, " ", sizeof hdr - strlen(hdr) - 1);
-        strncat(hdr, blk[i], sizeof hdr - strlen(hdr) - 1);
-        hlen = (int)strlen(blk[i]);
+          strncat(hdr, nx, sizeof hdr - strlen(hdr) - 1);
+        } else {
+          /* elvagott fejlec: ragasztas; ha igy hibas cim jonne ki (ket ':'),
+             akkor a vagas szokoznel volt -> szokozzel */
+          size_t L = strlen(hdr);
+          strncat(hdr, nx, sizeof hdr - L - 1);
+          if (bad_addr(hdr)) {
+            hdr[L] = 0;
+            strncat(hdr, " ", sizeof hdr - strlen(hdr) - 1);
+            strncat(hdr, nx, sizeof hdr - strlen(hdr) - 1);
+          }
+        }
+        i++;
       }
       strcpy(tmp, hdr);
       nt = 0;
@@ -253,15 +268,12 @@ static void blk_flush(void)
         }
       }
       ip = info; *ip = 0;
-      prevlen = 0;
       continue;
     }
     if (!c || !ip) continue;
-    /* folytatosor: ragasztas, ha az elozo sort a tordeles vagta el */
-    if (!(prevlen == wmax && prevlen > 0) || isspace((unsigned char)blk[i][0])) *ip++ = ' ';
+    if (isspace((unsigned char)blk[i][0])) *ip++ = ' ';
     for (j = 0; blk[i][j]; j++) *ip++ = blk[i][j];
     *ip = 0;
-    prevlen = (int)strlen(blk[i]);
   }
   if (c && ip) { *ip = 0; parse_info(c, cur_pass, info); }
   for (i = 0; i < blk_n; i++) free(blk[i]);
