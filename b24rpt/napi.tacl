@@ -39,6 +39,7 @@
 #SET napi^ports  4275:ATM 7000:HSM          == figyelt portok  port:nev
 #SET napi^clims  nclim000 nclim001          == CLIM-ek
 #SET napi^tclog  $DATA.EMSRPT               == TCyymmdd naplofajlok helye
+#SET climv^tmp   $DATA.EMSRPT.CLIMTMP       == munkafajl a climcmd kimenetehez
 
 ?SECTION napi^tegnap MACRO
 == tegnapi datum beallitasa: napi^nap = yyyy-mm-dd, napi^ymd = yymmdd
@@ -55,6 +56,19 @@ SINK [#SETMANY jd yy mo dd , [dt]]
 #SET napi^ymd [y2][mo][dd]
 #POP ts dt jd yy mo dd y2
 
+?SECTION climv MACRO
+== CLIMV valtozo clim parancs...
+== A climcmd csak fajlba tud irni (OUT), valtozoba (OUTV) nem: ezert a
+== kimenet a climv^tmp munkafajlba megy, onnan FUP COPY-val a valtozoba.
+[#IF [#FILEINFO /EXISTENCE/ [climv^tmp]] |THEN|
+  FUP /OUTV climv^junk/ PURGE [climv^tmp]!
+]
+climcmd /OUT [climv^tmp]/ %2 TO *%
+#SET %1%
+[#IF [#FILEINFO /EXISTENCE/ [climv^tmp]] |THEN|
+  FUP /OUTV %1%/ COPY [climv^tmp]
+]
+
 ?SECTION napi^nevterek MACRO
 == a CLIM-ek halozati nevterei -> napi^pairs ("clim nevter" soronkent)
 #PUSH rest cl nl ln nsn i
@@ -62,8 +76,7 @@ SINK [#SETMANY jd yy mo dd , [dt]]
 #SET rest [napi^clims]
 [#LOOP |WHILE| NOT [#EMPTYV rest] |DO|
   #SET rest [#SETMANY cl , [rest]]
-  #SET nl
-  climcmd /OUTV nl/ [cl] ip netns list
+  CLIMV nl [cl] ip netns list
   #SET i 1
   [#LOOP |WHILE| i <= [#LINECOUNT nl] |DO|
     #SET ln [#LINEGET nl i]
@@ -110,8 +123,7 @@ SINK [#SETMANY yy mo dd , [#CONTIME [#TIMESTAMP]]]
 #SET k 1
 [#LOOP |WHILE| k <= [#LINECOUNT napi^pairs] |DO|
   SINK [#SETMANY cl nsn , [#LINEGET napi^pairs k]]
-  #SET out
-  climcmd /OUTV out/ [cl] ip netns exec [nsn] ss -tin [pflt]
+  CLIMV out [cl] ip netns exec [nsn] ss -tin [pflt]
   #APPEND cur @@S 1 [cl] [nsn]
   #APPENDV cur out
   #SET k [#COMPUTE k + 1]
@@ -121,7 +133,7 @@ SINK [#SETMANY yy mo dd , [#CONTIME [#TIMESTAMP]]]
   #SET all
   #APPENDV all napi^prev
   #APPENDV all cur
-  RUN [napi^prog].TCPRATE /INV all, OUTV junk/ L [logf] [napi^ports]
+  RUN [napi^prog].TCPRATE /INV all/ L [logf] [napi^ports]
 ]
 #SET napi^prev
 #APPENDV napi^prev cur
@@ -130,7 +142,7 @@ SINK [#SETMANY yy mo dd , [#CONTIME [#TIMESTAMP]]]
 ?SECTION dailyrpt MACRO
 #FRAME
 #PUSH napi^ptlf napi^tlf napi^prog napi^emslib napi^ora napi^stopf
-#PUSH napi^ports napi^clims napi^tclog
+#PUSH napi^ports napi^clims napi^tclog climv^tmp climv^junk
 #PUSH napi^nap napi^ymd pf tf y2 mo dd
 napi^cfg
 
@@ -185,7 +197,7 @@ EMSERR [napi^nap]
 ?SECTION dailyloop MACRO
 #FRAME
 #PUSH napi^ptlf napi^tlf napi^prog napi^emslib napi^ora napi^stopf
-#PUSH napi^ports napi^clims napi^tclog napi^pairs napi^prev
+#PUSH napi^ports napi^clims napi^tclog napi^pairs napi^prev climv^tmp climv^junk
 #PUSH most hh mi kesz ma yy mo dd
 napi^cfg
 #SET kesz 0

@@ -27,12 +27,27 @@
 ==
 == A BEALLITASOK reszben add meg a CLIM-ek nevet es a program helyet!
 == ==================================================================
+?SECTION climv MACRO
+== CLIMV valtozo clim parancs...
+== A climcmd csak fajlba tud irni (OUT), valtozoba (OUTV) nem: ezert a
+== kimenet a climv^tmp munkafajlba megy, onnan FUP COPY-val a valtozoba.
+[#IF [#FILEINFO /EXISTENCE/ [climv^tmp]] |THEN|
+  FUP /OUTV climv^junk/ PURGE [climv^tmp]!
+]
+climcmd /OUT [climv^tmp]/ %2 TO *%
+#SET %1%
+[#IF [#FILEINFO /EXISTENCE/ [climv^tmp]] |THEN|
+  FUP /OUTV %1%/ COPY [climv^tmp]
+]
+
 ?SECTION tcprate MACRO
 #FRAME
 #PUSH clims prog port ns sec perc rsz pairs all out nl rest cl nsn ln i k pass
+#PUSH climv^tmp climv^junk
 == ---------------------- BEALLITASOK ----------------------
 #SET clims nclim000 nclim001          == CLIM-ek, szokozzel elvalasztva
 #SET prog  $DATA.EMSRPT.TCPRATE       == a TCPRATE program
+#SET climv^tmp $DATA.EMSRPT.CLIMTMP   == munkafajl a climcmd kimenetehez
 == ---------------------------------------------------------
 #SET port %1%
 #SET perc %2%
@@ -51,8 +66,7 @@
   [#LOOP |WHILE| NOT [#EMPTYV rest] |DO|
     #SET rest [#SETMANY cl , [rest]]
     [#IF ns '=' "*" |THEN|
-      #SET nl
-      climcmd /OUTV nl/ [cl] ip netns list
+      CLIMV nl [cl] ip netns list
       #SET i 1
       [#LOOP |WHILE| i <= [#LINECOUNT nl] |DO|
         #SET ln [#LINEGET nl i]
@@ -78,8 +92,7 @@
     #SET k 1
     [#LOOP |WHILE| k <= [#LINECOUNT pairs] |DO|
       SINK [#SETMANY cl nsn , [#LINEGET pairs k]]
-      #SET out
-      climcmd /OUTV out/ [cl] ip netns exec [nsn] ss -tin &
+      CLIMV out [cl] ip netns exec [nsn] ss -tin &
         dport = :[port] or sport = :[port]
       #APPEND all @@S [pass] [cl] [nsn]
       #APPENDV all out
