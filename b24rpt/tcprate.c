@@ -127,92 +127,146 @@ static void blk_add(const char *s)
   if (blk[blk_n]) strcpy(blk[blk_n++], s);
 }
 
-static void kv(Conn *c, int p, const char *t)
+/* kulcs keresese a kapcsolat osszefuzott szovegeben: a kulcs elott nem allhat
+   betu vagy '_' (pl. "rtt:" ne talalja meg a "minrtt:"-t), de szamjegy igen,
+   mert a tordeles miatt az elozo ertekhez ragadhat */
+static const char *find_key(const char *buf, const char *key)
 {
-  const char *v = strchr(t, ':');
-  if (!v) return;
-  v++;
-  if      (!strncmp(t, "data_segs_out:", 14))  c->dso[p] = to_ll(v);
-  else if (!strncmp(t, "data_segs_in:", 13))   c->dsi[p] = to_ll(v);
-  else if (!strncmp(t, "bytes_sent:", 11))     c->bsent[p] = to_ll(v);
-  else if (!strncmp(t, "bytes_received:", 15)) c->brecv[p] = to_ll(v);
-  else if (!strncmp(t, "bytes_retrans:", 14))  c->bretr[p] = to_ll(v);
-  else if (p == 2) {
-    if      (!strncmp(t, "rtt:", 4)) { c->rtt = atof(v); { const char *s = strchr(v, '/'); if (s) c->rttvar = atof(s + 1); } }
-    else if (!strncmp(t, "minrtt:", 7))  c->minrtt = atof(v);
-    else if (!strncmp(t, "lastrcv:", 8)) c->lastrcv = atol(v);
-    else if (!strncmp(t, "lastsnd:", 8)) c->lastsnd = atol(v);
-    else if (!strncmp(t, "cwnd:", 5))    c->cwnd = atol(v);
+  const char *p = buf;
+  size_t n = strlen(key);
+  while ((p = strstr(p, key)) != NULL) {
+    if (p == buf || !(isalpha((unsigned char)p[-1]) || p[-1] == '_')) return p + n;
+    p += n;
+  }
+  return NULL;
+}
+
+static void parse_info(Conn *c, int pas, const char *buf)
+{
+  const char *v;
+  if ((v = find_key(buf, "data_segs_out:")) != NULL)  c->dso[pas] = to_ll(v);
+  if ((v = find_key(buf, "data_segs_in:")) != NULL)   c->dsi[pas] = to_ll(v);
+  if ((v = find_key(buf, "bytes_sent:")) != NULL)     c->bsent[pas] = to_ll(v);
+  if ((v = find_key(buf, "bytes_received:")) != NULL) c->brecv[pas] = to_ll(v);
+  if ((v = find_key(buf, "bytes_retrans:")) != NULL)  c->bretr[pas] = to_ll(v);
+  if (pas == 2) {
+    if ((v = find_key(buf, "rtt:")) != NULL) {
+      const char *sl = strchr(v, '/');
+      c->rtt = atof(v);
+      if (sl) c->rttvar = atof(sl + 1);
+    }
+    if ((v = find_key(buf, "minrtt:")) != NULL)  c->minrtt = atof(v);
+    if ((v = find_key(buf, "lastrcv:")) != NULL) c->lastrcv = (long)to_ll(v);
+    if ((v = find_key(buf, "lastsnd:")) != NULL) c->lastsnd = (long)to_ll(v);
+    if ((v = find_key(buf, "cwnd:")) != NULL)    c->cwnd = (long)to_ll(v);
   }
 }
 
+/* elso szo (szokozok atugrasa utan) */
+static void first_word(const char *s, char *out, int max)
+{
+  int k = 0;
+  while (*s && isspace((unsigned char)*s)) s++;
+  while (*s && !isspace((unsigned char)*s) && k < max - 1) out[k++] = *s++;
+  out[k] = 0;
+}
+
+static int count_words(const char *s)
+{
+  int n = 0;
+  while (*s) {
+    while (*s && isspace((unsigned char)*s)) s++;
+    if (!*s) break;
+    n++;
+    while (*s && !isspace((unsigned char)*s)) s++;
+  }
+  return n;
+}
+
+/* Egy ss blokk feldolgozasa. A climcmd fajlba irt kimeneteben a hosszu sorok
+   barhol eltorhetnek (szam vagy kulcs kozepen is), es a sorvegi szokozok
+   elveszhetnek. Ezert:
+   - uj kapcsolat: allapot-szoval (ESTAB stb.) kezdodo sor; ha abban nincs meg
+     mind a 4 mezo (Recv-Q Send-Q Local Peer), a kovetkezo sor hozza ragad;
+   - a kapcsolat tobbi sora elvalaszto nelkul osszefuzve (szokozzel kezdodo
+     sor ele szokoz kerul), es a kulcsokat szovegkereses talalja meg. */
 static void blk_flush(void)
 {
-  int i, maxlen = 0, nmax = 0, wrapw = 0;
-  size_t tot = 1; char *buf, *p, *tok[5];
+  int i, j, wmax = 0, prevlen = 0;
+  size_t tot = 1;
+  char *info = NULL, *ip = NULL, first[32];
   Conn *c = NULL;
 
   if (!blk_n) return;
-  /* Ha a climcmd fix szelessegben tordelte a sorokat, a teljes szelessegu
-     sorokat szokoz nelkul kell a kovetkezohoz fuzni. */
+  /* a tordelesi szelesseg: a blokk leghosszabb sora. Csak az ilyen hosszu
+     (tordeles altal elvagott) sort ragasztjuk elvalaszto nelkul a kovetkezohoz;
+     a rovidebb sor utan szokoz jon (a levagott sorvegi szokoz helyett). */
   for (i = 0; i < blk_n; i++) {
     int L = (int)strlen(blk[i]);
-    tot += (size_t)L + 1;
-    if (L > maxlen) { maxlen = L; nmax = 1; } else if (L == maxlen) nmax++;
+    tot += (size_t)L + 2;
+    if (L > wmax) wmax = L;
   }
-  if (maxlen >= 70 && nmax >= 2) wrapw = maxlen;
-  buf = (char *)malloc(tot);
-  if (!buf) { fprintf(stderr, "Keves memoria\n"); exit(1); }
-  buf[0] = 0; p = buf;
-  for (i = 0; i < blk_n; i++) {
-    size_t L = strlen(blk[i]);
-    int glue = 0;
-    memcpy(p, blk[i], L); p += L;
-    /* teljes szelessegu sor: a kovetkezo a folytatasa, kiveve ha uj
-       kapcsolat (allapot-szoval kezdodo) sor jon */
-    if (wrapw && (int)L == wrapw && i + 1 < blk_n) {
-      char first[16]; int k = 0;
-      while (blk[i + 1][k] && !isspace((unsigned char)blk[i + 1][k]) && k < 15) {
-        first[k] = blk[i + 1][k]; k++;
-      }
-      first[k] = 0;
-      if (!is_state(first)) glue = 1;
-    }
-    if (!glue) *p++ = ' ';
-  }
-  for (i = 0; i < blk_n; i++) free(blk[i]);
-  *p = 0;
-  blk_n = 0;
+  info = (char *)malloc(tot);
+  if (!info) { fprintf(stderr, "Keves memoria\n"); exit(1); }
 
-  /* szavakra bontas */
-  p = buf;
-  for (;;) {
-    char *t;
-    while (*p && isspace((unsigned char)*p)) p++;
-    if (!*p) break;
-    t = p;
-    while (*p && !isspace((unsigned char)*p)) p++;
-    if (*p) *p++ = 0;
-    if (is_state(t)) {
-      /* State Recv-Q Send-Q Local Peer */
-      int k;
-      for (k = 0; k < 4; k++) {
-        while (*p && isspace((unsigned char)*p)) p++;
-        tok[k] = p;
-        while (*p && !isspace((unsigned char)*p)) p++;
-        if (*p) *p++ = 0;
+  for (i = 0; i < blk_n; i++) {
+    first_word(blk[i], first, sizeof first);
+    if (is_state(first)) {
+      char hdr[1024], tmp[1024], *tok[6];
+      int nt, hlen;
+      if (c && ip) { *ip = 0; parse_info(c, cur_pass, info); }
+      c = NULL;
+      sprintf(hdr, "%.1000s", blk[i]);
+      hlen = (int)strlen(blk[i]);
+      /* a fejlecsor folytatasa: amig nincs meg mind a 4 mezo, vagy a sort a
+         tordeles vagta el, es a kovetkezo sor nem szokozzel/allapottal kezdodik */
+      while (i + 1 < blk_n) {
+        char f2[32];
+        int cont;
+        first_word(blk[i + 1], f2, sizeof f2);
+        if (is_state(f2)) break;
+        cont = count_words(hdr) < 5 ||
+               (hlen == wmax && !isspace((unsigned char)blk[i + 1][0]));
+        if (!cont) break;
+        i++;
+        if (hlen != wmax || isspace((unsigned char)blk[i][0]))
+          strncat(hdr, " ", sizeof hdr - strlen(hdr) - 1);
+        strncat(hdr, blk[i], sizeof hdr - strlen(hdr) - 1);
+        hlen = (int)strlen(blk[i]);
       }
-      if (!*tok[3] || !strchr(tok[2], ':') || !strchr(tok[3], ':')) { c = NULL; continue; }
-      c = get_conn(cur_clim, cur_ns, tok[2], tok[3]);
-      if (c) {
-        c->seen[cur_pass] = 1;
-        if (cur_pass == 2) { c->recvq = atol(tok[0]); c->sendq = atol(tok[1]); }
+      strcpy(tmp, hdr);
+      nt = 0;
+      {
+        char *q = tmp;
+        while (*q && nt < 6) {
+          while (*q && isspace((unsigned char)*q)) *q++ = 0;
+          if (!*q) break;
+          tok[nt++] = q;
+          while (*q && !isspace((unsigned char)*q)) q++;
+        }
       }
-    } else if (c && strchr(t, ':')) {
-      kv(c, cur_pass, t);
+      if (nt >= 5 && strchr(tok[3], ':') && strchr(tok[4], ':')) {
+        c = get_conn(cur_clim, cur_ns, tok[3], tok[4]);
+        if (c) {
+          c->seen[cur_pass] = 1;
+          if (cur_pass == 2) { c->recvq = atol(tok[1]); c->sendq = atol(tok[2]); }
+        }
+      }
+      ip = info; *ip = 0;
+      prevlen = 0;
+      continue;
     }
+    if (!c || !ip) continue;
+    /* folytatosor: ragasztas, ha az elozo sort a tordeles vagta el */
+    if (!(prevlen == wmax && prevlen > 0) || isspace((unsigned char)blk[i][0])) *ip++ = ' ';
+    for (j = 0; blk[i][j]; j++) *ip++ = blk[i][j];
+    *ip = 0;
+    prevlen = (int)strlen(blk[i]);
   }
-  free(buf);
+  if (c && ip) { *ip = 0; parse_info(c, cur_pass, info); }
+  for (i = 0; i < blk_n; i++) free(blk[i]);
+  blk_n = 0;
+  free(info);
 }
 
 /* ---------- riport ---------- */
@@ -300,8 +354,11 @@ static void stat_port(int p, Stat *st)
     Conn *x = &conn[i];
     if (p > 0 && port_of(x->local) != p && port_of(x->peer) != p) continue;
     if (x->seen[1] && x->seen[2]) {
-      st->in += x->dsi[2] - x->dsi[1];   st->out += x->dso[2] - x->dso[1];
-      st->bin += x->brecv[2] - x->brecv[1]; st->bout += x->bsent[2] - x->bsent[1];
+      /* visszaugro szamlalo (pl. ujraepult kapcsolat ugyanazzal a porttal): 0 */
+      if (x->dsi[2] >= x->dsi[1]) st->in += x->dsi[2] - x->dsi[1];
+      if (x->dso[2] >= x->dso[1]) st->out += x->dso[2] - x->dso[1];
+      if (x->brecv[2] >= x->brecv[1]) st->bin += x->brecv[2] - x->brecv[1];
+      if (x->bsent[2] >= x->bsent[1]) st->bout += x->bsent[2] - x->bsent[1];
       st->conns++;
       if (x->sendq > 0) st->sq++;
       if (x->lastrcv > 60000) st->cs++;
