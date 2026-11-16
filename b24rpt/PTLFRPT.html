@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>PTLFRPT</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">PTLFRPT</h1>
+</header>
+<h1 id="ptlfrpt--base24-pos-napi-tranzakciós-riport-ptlf">PTLFRPT –
+BASE24-pos napi tranzakciós riport (PTLF)</h1>
+<h2 id="1-cél">1. Cél</h2>
+<p>A PTLFRPT a BASE24-pos (classic) napi tranzakciós naplójából, a
+<strong>PTLF</strong>-ből (<code>POyymmdd</code>) készít üzemeltetési
+riportot. A banknál kibocsátói nézetből: a saját kártyabirtokosok más
+bankok POS-terminálján végzett tranzakciói, amelyek a kártyahálózaton
+(Visa, Mastercard) érkeznek engedélyezésre.</p>
+<p>A program a fájlt egyszer olvassa végig, és négy riportot ír:</p>
+<table>
+<thead>
+<tr class="header">
+<th>#</th>
+<th>Riport</th>
+<th>Kérdés, amire válaszol</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td>Napi összesítő</td>
+<td>Mennyi és milyen tranzakció volt, mennyit engedélyeztünk, ki
+döntött, mekkora összegben?</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td>Válaszkód-elemzés</td>
+<td>Miért utasítottunk el, és ki hozta a döntést (host, BASE24,
+STIP)?</td>
+</tr>
+<tr class="odd">
+<td>3</td>
+<td>Óránkénti forgalom</td>
+<td>Mikor volt csúcs, mikor nem volt elérhető a host (STIP), milyen
+gyorsan válaszolt?</td>
+</tr>
+<tr class="even">
+<td>4</td>
+<td>Melléklet: országok</td>
+<td>Mely országokban használták a kártyákat? (tájékoztató)</td>
+</tr>
+</tbody>
+</table>
+<p>A kimenet ékezet nélküli ASCII, legfeljebb 79 oszlop széles, így
+terminálon és spoolerben is olvasható. <strong>Kártyaadatot (kártyaszám,
+Track 2, lejárat, számlaszám) a program nem ír ki.</strong></p>
+<h2 id="2-használat">2. Használat</h2>
+<pre><code>RUN PTLFRPT /OUT $S.#PTLFRPT/ $vol.subvol.POyymmdd      == riport a spoolerbe
+RUN PTLFRPT $vol.subvol.POyymmdd                        == riport a terminálra
+RUN PTLFRPT -d 5 $vol.subvol.POyymmdd                   == diagnosztika</code></pre>
+<p>Az egyetlen opció a <code>-d n</code>: az első <em>n</em> tranzakciós
+rekord fontos mezőit írja ki (kártyaadat nélkül), majd kilép. Új fájlnál
+vagy BASE24-verzióváltás után ezzel lehet ellenőrizni, hogy a mezők jó
+helyről olvasódnak-e.</p>
+<p>Diagnosztika példa:</p>
+<pre><code>#1 hossz=1846 REC-TYP=01 FRMT=5 TYP=0210 TC=10 T=2 RESP=001
+   ORIGINATOR=7 RESPONDER=7 RTE-STAT=00 ISS-CDE=00 AUTH-IND=P
+   ORIG=&#39;VISA&#39; DEST=&#39;BICI&#39; AUTHORIZER=&#39;AUTHH&#39;
+   AMT-1=100000 AMT-2=0 CRNCY=348 CNTRY=US RVRL=00 APPRV(7-8)=&#39;  &#39;
+   CITY=&#39;New York     &#39; ENTRY-MDE=012
+   DAT-TIM=2026.11.02 12:52:12 TRAN-DAT=261102 TRAN-TIM=14521000
+   host valaszido=2164 ms
+Bajtsorrend: big-endian. Tranzakcios rekordok: 78</code></pre>
+<p>A napi automatikus futtatást a <code>napi.tacl</code>
+<code>DAILYRPT</code> makrója végzi (a tegnapi PTLF-re, kimenet:
+<code>$S.#B24NAPI.POS</code>).</p>
+<h2 id="3-telepítés">3. Telepítés</h2>
+<ol type="1">
+<li>A <code>ptlfrpt.c</code> feltöltése EDIT fájlként (pl.
+<code>PTLFRPTC</code>).</li>
+<li>Fordítás a szokásos módon, pl.:
+<code>CCOMP /IN PTLFRPTC/ PTLFRPT; RUNNABLE, SYSTYPE GUARDIAN</code>.</li>
+<li>Első futtatás diagnosztikával (<code>-d 5</code>).</li>
+</ol>
+<p>Guardian-specifikus részek a programban:</p>
+<ul>
+<li>fájlolvasás: <code>FILE_OPEN_</code>, <code>READX</code>,
+<code>FILE_GETINFO_</code> (a <code>cextdecs</code> behúzása
+<code>.h</code> nélkül: <code>#include &lt;cextdecs(…)&gt;</code>);</li>
+<li>időátváltás: <code>CONVERTTIMESTAMP</code> (GMT → helyi idő) és
+<code>INTERPRETTIMESTAMP</code>.</li>
+</ul>
+<h2 id="4-adatforrás">4. Adatforrás</h2>
+<h3 id="41-a-ptlf">4.1 A PTLF</h3>
+<ul>
+<li>Fájlnév: <code>POyymmdd</code>, entry-sequenced, egy fájl egy üzleti
+nap.</li>
+<li>Rekord: <code>HEAD</code> (172 bájt) + <code>AUTH</code> (614 bájt)
+= minimum 786 bájt (a ténylegesen beolvasott rekordok hosszabbak
+lehetnek a token-adatok miatt).</li>
+<li>A mezőpozíciók a BASE24-pos Release 6.0 DDL-jéből
+(<code>DDLFPTLF</code>, <code>DDLGDEFS</code>) származnak.</li>
+</ul>
+<h3 id="42-mely-rekordokat-dolgozza-fel">4.2 Mely rekordokat dolgozza
+fel</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Rekord</th>
+<th>Feltétel</th>
+<th>Kezelés</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Tranzakció</td>
+<td><code>HEAD.REC-TYP = 01</code> és <code>REC-FRMT = 5</code></td>
+<td>feldolgozza</td>
+</tr>
+<tr class="even">
+<td>Kivétel</td>
+<td><code>REC-TYP</code> 20–23</td>
+<td>csak megszámolja (posted / not posted / partially posted / invalid
+data)</td>
+</tr>
+<tr class="odd">
+<td>Terminál-összesítő</td>
+<td><code>REC-TYP = 04</code></td>
+<td>megszámolja</td>
+</tr>
+<tr class="even">
+<td>Egyeztetés, issuer reversal response</td>
+<td><code>AUTH.TYP</code> 0500, 0412</td>
+<td>kihagyja („egyéb”)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="43-felhasznált-mezők">4.3 Felhasznált mezők</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Mire</th>
+<th>Mező</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Időpont</td>
+<td><code>HEAD.DAT-TIM</code> (rendszeridő, helyi időre váltva)</td>
+</tr>
+<tr class="even">
+<td>Üzenettípus</td>
+<td><code>AUTH.TYP</code> (0210, 0220, 0420)</td>
+</tr>
+<tr class="odd">
+<td>Tranzakciótípus</td>
+<td><code>AUTH.TRAN-CDE.TC</code></td>
+</tr>
+<tr class="even">
+<td>Válaszkód</td>
+<td><code>AUTH.RESP-CDE</code> (3 jegy)</td>
+</tr>
+<tr class="odd">
+<td>Összeg, deviza</td>
+<td><code>AUTH.AMT-1</code>, <code>AUTH.ORIG-CRNCY-CDE</code></td>
+</tr>
+<tr class="even">
+<td>Döntés helye</td>
+<td><code>AUTH.RESPONDER</code>, <code>AUTH.RTE-STAT</code></td>
+</tr>
+<tr class="odd">
+<td>Engedélyező</td>
+<td><code>AUTH.AUTHORIZER</code></td>
+</tr>
+<tr class="even">
+<td>Host válaszidő</td>
+<td><code>AUTH.RE-ENTRY-TIM − AUTH.EXIT-TIM</code></td>
+</tr>
+<tr class="odd">
+<td>Sztornó oka</td>
+<td><code>AUTH.RVRL-CDE</code></td>
+</tr>
+<tr class="even">
+<td>Ország</td>
+<td><code>AUTH.TERM-CNTRY-CDE</code></td>
+</tr>
+</tbody>
+</table>
+<p>A 64 bites bináris mezők bájtsorrendjét a program az első rekord
+időbélyegéből magától felismeri.</p>
+<h2 id="5-beépített-szabályok">5. Beépített szabályok</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Szabály</th>
+<th>Érték</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Engedélyezett válaszkód</td>
+<td><code>000–049</code> (a többi elutasított)</td>
+</tr>
+<tr class="even">
+<td>Belföld</td>
+<td><code>TERM-CNTRY-CDE = HU</code>, minden más külföld (üres:
+<code>??</code>)</td>
+</tr>
+<tr class="odd">
+<td>Döntés helye</td>
+<td><code>RESPONDER</code> 5 = Host; 3 és <code>RTE-STAT = 00</code> =
+BASE24; 3 és <code>RTE-STAT ≠ 00</code> = STIP (host nem elérhető); 4 =
+Host Interface; 6/7 = Interchange</td>
+</tr>
+<tr class="even">
+<td>Válaszkód-megnevezések</td>
+<td>a BASE24-pos kódok (122 db) a programba építve</td>
+</tr>
+<tr class="odd">
+<td>STIP-időszakok</td>
+<td>STIP-es percek, legfeljebb 5 perc szünettel összevonva</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tranzakciótípusok</strong> (<code>TRAN-CDE.TC</code>): 10
+vásárlás, 11 előengedélyezés, 12 előengedélyezés lezárása, 13
+levelezéses/telefonos, 14 visszatérítés, 15 készpénzfelvétel, 16
+kártyaellenőrzés, 17 egyenleglekérdezés, 18 vásárlás + cashback, 21–24
+korrekció. A 0420-as üzenet típustól függetlenül sztornó.</p>
+<p><strong>Nettó forgalom</strong> (devizánként, a tranzakció
+devizájában, csak engedélyezett tranzakciók):</p>
+<pre><code>Nettó = vásárlás + lezárás + MOTO + készpénz + cashback − visszatérítés − sztornó</code></pre>
+<p>Az előengedélyezés (zárolt összeg) külön oszlopban jelenik meg, a
+nettóba nem számít bele.</p>
+<p>Megjegyzés a döntés helyéhez: ha a saját host egy interchange
+interfészen át kapcsolódik (pl. <code>DEST = BICI</code>), a normál
+host-engedélyezések „Interchange” sorban jelennek meg. Ezt az
+„Engedélyező (RESPONDER)” tábla mutatja meg, ahol az
+<code>AUTHORIZER</code> neve is látszik.</p>
+<h2 id="6-a-riportok">6. A riportok</h2>
+<h3 id="61-napi-összesítő">6.1 Napi összesítő</h3>
+<pre><code>===============================================================================
+BASE24 POS (KIBOCSATOI) - NAPI OSSZESITO
+Forras:  $DATA.PTLF.PO261114
+Idoszak: 2026.11.14 00:00:16 - 2026.11.14 23:59:11
+===============================================================================
+Rekordok:  osszes 20 008, tranzakcio 20 000, terminal-osszesito 5,
+           egyeb 0, rovid 0
+Kivetelek: 20 konyvelt 1, 21 nem konyvelt 1, 22 reszben 0,
+           23 hibas adat 1
+Engedelyezett: valaszkod &lt; 050
+
+Tipus                            Osszes   Engedelyez.  Elutasitott   Jovah.%
+----------------------------------------------------------------------------
+Vasarlas                         18 340        17 463          877    95,22%
+Eloengedelyezes                     382           361           21    94,50%
+...
+OSSZESEN                         20 000        19 037          963    95,19%</code></pre>
+<p>Táblák sorrendben:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Tábla</th>
+<th>Tartalom</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Típus</td>
+<td>tranzakciótípusonként összes, engedélyezett, elutasított,
+jóváhagyási arány</td>
+</tr>
+<tr class="even">
+<td>Bontás</td>
+<td>belföld / külföld</td>
+</tr>
+<tr class="odd">
+<td>Döntés helye</td>
+<td>Host, BASE24, STIP, Host Interface, Interchange</td>
+</tr>
+<tr class="even">
+<td>Engedélyező (RESPONDER)</td>
+<td><code>AUTHORIZER</code> neve + <code>RESPONDER</code> kód
+szerint</td>
+</tr>
+<tr class="odd">
+<td>Összegek devizánként</td>
+<td>vásárlás + lezárás, visszatérítés, sztornó, előengedélyezés
+(zárolt), <strong>nettó</strong></td>
+</tr>
+</tbody>
+</table>
+<p>A rekordszámok és a kivételek sora jelzi, ha a fájlban szokatlanul
+sok kivétel-rekord van (feldolgozási hiba a BASE24-ben).</p>
+<h3 id="62-válaszkód-elemzés">6.2 Válaszkód-elemzés</h3>
+<pre><code>A) Elutasito valaszkodok
+Kod Megnevezes                              Darab    Arany   Host BASE24   STIP
+-------------------------------------------------------------------------------
+051 Lejart kartya                             371   38,53%    333     38      -
+055 Nem engedelyezett tranzakciotipus         167   17,34%    148     19      -
+...</code></pre>
+<ul>
+<li><strong>A)</strong> elutasító, <strong>B)</strong> engedélyező
+kódok, gyakoriság szerint.</li>
+<li>A „döntés helye” oszlopok közül csak azok jelennek meg, amelyekben
+van adat.</li>
+<li>Ha egy elutasító kód a <strong>STIP</strong> vagy
+<strong>BASE24</strong> oszlopban sok, az nem a kártyabirtokosra, hanem
+a host elérhetőségére vagy BASE24-konfigurációra utal.</li>
+</ul>
+<h3 id="63-óránkénti-forgalom">6.3 Óránkénti forgalom</h3>
+<pre><code>Ora      Darab  Elut%  STIP TOszt Atlms p95ms
+-------------------------------------------------------------------------------
+...
+17-18    1 432    4,8     -     5   118   210 ####################
+18-19    1 577    4,4     -     3   117   218 ###################### &lt;CSUCS
+...
+Napi atlag:      0,23 tranzakcio/mp
+Csucsora:        18:00-19:00  1 577 db, atlag 0,44 tr/mp
+Csucsperc:       13:53        39 db, atlag 0,7 tr/mp
+Csucsmasodperc:  15:32:03     5 tr/mp
+Host valaszido:  atlag 132 ms, median 114 ms, p95 266 ms, p99 474 ms
+
+STIP-idoszakok (host nem elerheto):
+  03:02-03:50  39 tranzakcio
+  19:41-19:44  64 tranzakcio</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th>Oszlop / sor</th>
+<th>Jelentés</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Elut%</td>
+<td>elutasítási arány az órában</td>
+</tr>
+<tr class="even">
+<td>STIP</td>
+<td>STIP-ben engedélyezett/elutasított tranzakciók</td>
+</tr>
+<tr class="odd">
+<td>TOszt</td>
+<td>időtúllépés miatti sztornó (0420, <code>RVRL-CDE = 01</code>)</td>
+</tr>
+<tr class="even">
+<td>Atlms / p95ms</td>
+<td>host válaszidő átlaga és 95. percentilise (ms)</td>
+</tr>
+<tr class="odd">
+<td><code>&lt;CSUCS</code></td>
+<td>a legforgalmasabb óra</td>
+</tr>
+<tr class="even">
+<td><code>&lt;ELUT</code></td>
+<td>az elutasítási arány a napi átlag 2-szerese felett (min. 50
+tranzakció)</td>
+</tr>
+<tr class="odd">
+<td>STIP-időszakok</td>
+<td>mikor nem volt elérhető a host, és hány tranzakciót érintett</td>
+</tr>
+</tbody>
+</table>
+<h3 id="64-melléklet-országok">6.4 Melléklet: országok</h3>
+<p>A legforgalmasabb 25 ország darabszámmal, aránnyal és elutasítási
+aránnyal; a többi „Egyéb” sorban. Forrás: <code>TERM-CNTRY-CDE</code>;
+<code>??</code> = üres mező.</p>
+<h2 id="7-hibaelhárítás">7. Hibaelhárítás</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Tünet</th>
+<th>Ok</th>
+<th>Teendő</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>cannot open source file "cextdech"</code></td>
+<td>a <code>cextdecs</code> <code>.h</code>-val lett behúzva</td>
+<td><code>#include &lt;cextdecs(FILE_OPEN_,…)&gt;</code> –
+<code>.h</code> nélkül</td>
+</tr>
+<tr class="even">
+<td><code>unresolved reference to _status_eq</code></td>
+<td>régi forrásváltozat</td>
+<td>a jelenlegi forrás <code>FILE_GETINFO_</code>-val ellenőrzi a
+<code>READX</code>-et</td>
+</tr>
+<tr class="odd">
+<td><code>Nincs tranzakcios rekord …</code></td>
+<td>rossz fájl, vagy eltérő rekordszerkezet</td>
+<td><code>-d 5</code> kimenete: <code>REC-TYP=01</code>,
+<code>FRMT=5</code>, <code>TYP=0210</code> legyen</td>
+</tr>
+<tr class="even">
+<td>Értelmetlen mezőértékek a diagnosztikában</td>
+<td>eltérő BASE24 DDL (más release)</td>
+<td>a mezőpozíciókat a saját DDL alapján kell igazítani</td>
+</tr>
+<tr class="odd">
+<td>Minden „Interchange” döntés</td>
+<td>a host interchange interfészen kapcsolódik</td>
+<td>normális; az „Engedélyező” tábla mutatja az <code>AUTHORIZER</code>
+nevet</td>
+</tr>
+<tr class="even">
+<td>Időpontok eltolva</td>
+<td>–</td>
+<td>a program a rendszer helyi idejét használja
+(<code>CONVERTTIMESTAMP</code>)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="8-kapcsolódó-programok">8. Kapcsolódó programok</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Program</th>
+<th>Leírás</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>TLFRPT</code></td>
+<td>ugyanez a BASE24-atm TLF-re (<code>TLyymmdd</code>), saját ATM-ek
+listájával</td>
+</tr>
+<tr class="even">
+<td><code>EMSERR</code> / <code>EMSSCAN</code></td>
+<td>hibakeresés az EMS logban</td>
+</tr>
+<tr class="odd">
+<td><code>TCPRATE</code></td>
+<td>TCP-portok forgalma a CLIM-eken</td>
+</tr>
+<tr class="even">
+<td><code>napi.tacl</code></td>
+<td><code>DAILYRPT</code> (napi riportok) és <code>DAILYLOOP</code>
+(háttérfutás)</td>
+</tr>
+</tbody>
+</table>
+</body>
+</html>
