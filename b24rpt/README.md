@@ -94,3 +94,22 @@ Indítás háttérben (a `NAPIIN` EDIT fájlban: `LOAD /KEEP 1/ $DATA.EMSRPT.NAP
 TACL /NAME $NAPI, NOWAIT, IN $DATA.EMSRPT.NAPIIN, OUT $S.#B24NAPI.LOG/
 ```
 NetBatch esetén a job egyszerűen: `LOAD /KEEP 1/ $DATA.EMSRPT.NAPI` majd `DAILYRPT`.
+
+---
+
+# TCPRATE – egy port TCP-forgalma a CLIM-eken (`tcprate.tacl` + `tcprate.c`)
+
+```
+LOAD /KEEP 1/ $DATA.EMSRPT.TCPRMAC
+TCPRATE 4275                 == ATM, minden névtér, 60 mp
+TCPRATE 7000 NMLNS006        == HSM, adott névtér
+TCPRATE 4275 * 30            == minden névtér, 30 mp
+```
+- Mindkét irányt nézi (`dport` és `sport`), így mindegy, hogy a BASE24 a szerver vagy a kliens.
+- Névtér nélkül (vagy `*`) a beállított CLIM-ek összes névterét végignézi (`ip netns list`).
+- Két pillanatkép (`climcmd … ip netns exec <ns> ss -tin`) a megadott idő különbséggel; a `TCPRATE`
+  program kapcsolatonként kiszámolja az üzenet/mp értéket (`data_segs_in/out` különbség), és jelzi:
+  `SQ` (Send-Q > 0), `CS` (60 mp-nél régebben jött adat), `RT` (újraküldés), `UJ`/`MSZ`.
+- Összesítés túloldali IP-cím szerint (terheléselosztás) és mindösszesen.
+
+A CLIM-ek nevét és a program helyét a makró BEÁLLÍTÁSOK részében kell megadni.
