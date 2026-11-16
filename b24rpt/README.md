@@ -61,9 +61,10 @@ A tesztfájlok szintetikusak, valódi kártyaadat nincs bennük.
 Az EMS logfájlok (`ZZEVnnnn`, 843-as kód) binárisak, ezért két lépésben dolgozunk:
 
 1. **`emserr.tacl`** (TACL makró): az `EMSDIST` printing distributorral a `$0` collector
-   logjaiból egy nap eseményeit szövegfájlba íratja (`TIME`/`STOP`).
+   logjaiból egy nap eseményeit szövegfájlba íratja (`TIME`/`STOP`, collector: `$PCOLL`).
 2. **`emsscan.c`** (C program): a szövegben hibára utaló eseményeket keres, és riportot készít:
-   keresőszavanként és forrásonként (processz, subsystem) összesít, majd kiírja a talált eseményeket.
+   keresőszavanként és forrásonként (processz, subsystem) összesít, majd eseménytípusonként
+   (processz + subsystem + eseményszám) kiírja a darabszámot, az első/utolsó időpontot és egy mintát.
 
 ```
 LOAD /KEEP 1/ $DATA.EMSRPT.EMSERR
@@ -74,4 +75,5 @@ RUN EMSSCAN $DATA.EMSRPT.EMSTXT ABEND DOWN    == közvetlenül, saját keresősz
 
 Beépített keresőszavak: ERROR, FAIL, ABEND, ABORT, TRAP, HALT, DOWN, TIMEOUT, TIME-OUT,
 TIMED OUT, UNABLE, CANNOT, NOT AVAILABLE, NOT RESPONDING, STOPPED, DEADLOCK, VIOLATION,
-CRITICAL, LOST, DISCONNECT, OVERFLOW, FULL. A `*`-gal kezdődő (kritikus) események mindig találatok.
+CRITICAL, LOST, DISCONNECT, OVERFLOW, FULL, UNAVAILABLE. A kritikus események (`*` a subsystem előtt)
+mindig találatok.

@@ -8,7 +8,7 @@
 ==   EMSERR 2026-11-15      == adott nap
 ==
 == Mukodes:
-==   1. Az EMSDIST printing distributor a $0 collector logjaibol
+==   1. Az EMSDIST printing distributor a collector ($PCOLL) logjaibol
 ==      (ZZEVnnnn, 843-as kodu fajlok) szovegge alakitja a nap esemenyeit
 ==      egy munkafajlba (TIME/STOP: a nap eleje es vege).
 ==   2. Az EMSSCAN program ebben keresi a hibara utalo esemenyeket, es
@@ -20,7 +20,7 @@
 #FRAME
 #PUSH ef coll nap ts dt jd yy mo dd
 #SET ef   $DATA.EMSRPT.EMSTXT      == munkafajl (felulirodik)
-#SET coll $0                       == EMS collector
+#SET coll $PCOLL                   == EMS collector (nalatok $PCOLL)
 
 == nap: parameter, vagy ha nincs megadva, a tegnapi nap (yyyy-mm-dd)
 #SET nap %1%
