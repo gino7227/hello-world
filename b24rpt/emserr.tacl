@@ -1,0 +1,51 @@
+?TACL MACRO
+== ==================================================================
+== EMSERR - egy nap EMS esemenyei kozott hibauzenetek keresese
+==
+== Hasznalat:
+==   LOAD /KEEP 1/ $DATA.EMSRPT.EMSERR
+==   EMSERR                 == tegnapi nap
+==   EMSERR 2026-11-15      == adott nap
+==
+== Mukodes:
+==   1. Az EMSDIST printing distributor a $0 collector logjaibol
+==      (ZZEVnnnn, 843-as kodu fajlok) szovegge alakitja a nap esemenyeit
+==      egy munkafajlba (TIME/STOP: a nap eleje es vege).
+==   2. Az EMSSCAN program ebben keresi a hibara utalo esemenyeket, es
+==      a riportot a spoolerbe irja ($S.#EMSERR).
+==
+== A munkafajl helyet (ef) es a collectort (coll) ird at a sajatodra.
+== ==================================================================
+?SECTION emserr MACRO
+#FRAME
+#PUSH ef coll nap ts dt jd yy mo dd
+#SET ef   $DATA.EMSRPT.EMSTXT      == munkafajl (felulirodik)
+#SET coll $0                       == EMS collector
+
+== nap: parameter, vagy ha nincs megadva, a tegnapi nap (yyyy-mm-dd)
+#SET nap %1%
+[#IF [#EMPTYV nap] |THEN|
+  #SET ts [#JULIANTIMESTAMP]
+  #SET ts [#COMPUTE ts - 86400000000]
+  #SET dt [#INTERPRETTIMESTAMP [ts]]
+  SINK [#SETMANY jd yy mo dd , [dt]]
+  [#IF mo < 10 |THEN| #SET mo 0[mo]]
+  [#IF dd < 10 |THEN| #SET dd 0[dd]]
+  #SET nap [yy]-[mo]-[dd]
+]
+
+#OUTPUT EMSERR: [nap] 00:00:00 - 23:59:59, collector [coll]
+#OUTPUT EMSERR: munkafajl [ef]
+
+== munkafajl ujra letrehozasa (entry-sequenced szovegsorok)
+[#IF [#FILEINFO /EXISTENCE/ [ef]] |THEN| FUP PURGE [ef]!]
+FUP CREATE [ef], TYPE E, REC 200, EXT (200,200), MAXEXTENTS 500
+
+== 1. EMS log -> szoveg (a STOP idopontnal az EMSDIST magatol leall)
+EMSDIST /NAME/ TYPE PRINTING, COLLECTOR [coll], TEXTOUT [ef], &
+  TIME [nap] 00:00:00, STOP [nap] 23:59:59
+
+== 2. hibakereses, riport a spoolerbe
+RUN EMSSCAN /OUT $S.#EMSERR/ [ef]
+#OUTPUT EMSERR: kesz, riport: $S.#EMSERR
+#UNFRAME

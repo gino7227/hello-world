@@ -53,3 +53,25 @@ TZ=Europe/Budapest /tmp/ptlfrpt /tmp/po.dat
 TZ=Europe/Budapest /tmp/tlfrpt /tmp/tl.dat
 ```
 A tesztfájlok szintetikusak, valódi kártyaadat nincs bennük.
+
+---
+
+# EMSERR / EMSSCAN – hibakeresés az EMS logban
+
+Az EMS logfájlok (`ZZEVnnnn`, 843-as kód) binárisak, ezért két lépésben dolgozunk:
+
+1. **`emserr.tacl`** (TACL makró): az `EMSDIST` printing distributorral a `$0` collector
+   logjaiból egy nap eseményeit szövegfájlba íratja (`TIME`/`STOP`).
+2. **`emsscan.c`** (C program): a szövegben hibára utaló eseményeket keres, és riportot készít:
+   keresőszavanként és forrásonként (processz, subsystem) összesít, majd kiírja a talált eseményeket.
+
+```
+LOAD /KEEP 1/ $DATA.EMSRPT.EMSERR
+EMSERR                 == tegnapi nap
+EMSERR 2026-11-15      == adott nap
+RUN EMSSCAN $DATA.EMSRPT.EMSTXT ABEND DOWN    == közvetlenül, saját keresőszavakkal
+```
+
+Beépített keresőszavak: ERROR, FAIL, ABEND, ABORT, TRAP, HALT, DOWN, TIMEOUT, TIME-OUT,
+TIMED OUT, UNABLE, CANNOT, NOT AVAILABLE, NOT RESPONDING, STOPPED, DEADLOCK, VIOLATION,
+CRITICAL, LOST, DISCONNECT, OVERFLOW, FULL. A `*`-gal kezdődő (kritikus) események mindig találatok.
