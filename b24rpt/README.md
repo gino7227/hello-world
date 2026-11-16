@@ -77,3 +77,20 @@ Beépített keresőszavak: ERROR, FAIL, ABEND, ABORT, TRAP, HALT, DOWN, TIMEOUT,
 TIMED OUT, UNABLE, CANNOT, NOT AVAILABLE, NOT RESPONDING, STOPPED, DEADLOCK, VIOLATION,
 CRITICAL, LOST, DISCONNECT, OVERFLOW, FULL, UNAVAILABLE. A kritikus események (`*` a subsystem előtt)
 mindig találatok.
+
+---
+
+# NAPI – reggeli automatikus futtatás (`napi.tacl`)
+
+- **`DAILYRPT [yyyy-mm-dd]`** – egy nap összes riportja (alap: tegnap): `PTLFRPT` → `$S.#B24NAPI.POS`,
+  `TLFRPT` → `$S.#B24NAPI.ATM`, `EMSERR` → `$S.#EMSERR`. Hiányzó PTLF/TLF fájlt jelez, és továbblép.
+- **`DAILYLOOP`** – háttérben fut, minden nap a beállított időpont (alap 06:00) után egyszer lefuttatja
+  a `DAILYRPT`-t; 5 percenként ellenőriz. Leállítás: a stop-fájl létrehozása vagy `STOP $NAPI`.
+
+A fájlneveket a `napi^cfg` szekcióban kell beállítani.
+
+Indítás háttérben (a `NAPIIN` EDIT fájlban: `LOAD /KEEP 1/ $DATA.EMSRPT.NAPI` és `DAILYLOOP`):
+```
+TACL /NAME $NAPI, NOWAIT, IN $DATA.EMSRPT.NAPIIN, OUT $S.#B24NAPI.LOG/
+```
+NetBatch esetén a job egyszerűen: `LOAD /KEEP 1/ $DATA.EMSRPT.NAPI` majd `DAILYRPT`.

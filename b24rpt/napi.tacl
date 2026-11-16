@@ -1,0 +1,117 @@
+?TACL MACRO
+== ==================================================================
+== NAPI - BASE24 napi riportok automatikus futtatasa
+==
+== DAILYRPT [yyyy-mm-dd]   egy nap osszes riportja (alap: tegnap)
+==   - POS riport:  PTLFRPT a POyymmdd fajlra   -> $S.#B24NAPI.POS
+==   - ATM riport:  TLFRPT  a TLyymmdd fajlra   -> $S.#B24NAPI.ATM
+==   - EMS hibak:   EMSERR (EMSDIST + EMSSCAN)  -> $S.#EMSERR
+==
+== DAILYLOOP               hattérben fut, es minden nap a beallitott
+==                          idopont utan egyszer lefuttatja a DAILYRPT-t
+==   Leallitas: hozd letre a stop-fajlt (FUP CREATE <stopf>), vagy STOP $NAPI
+==
+== Inditas hatterben (egyszer kell, pl. rendszerinditas utan):
+==   TACL /NAME $NAPI, NOWAIT, IN $DATA.EMSRPT.NAPIIN, OUT $S.#B24NAPI.LOG/
+==   ahol a NAPIIN EDIT fajl tartalma:
+==     LOAD /KEEP 1/ $DATA.EMSRPT.NAPI
+==     DAILYLOOP
+==
+== NetBatch eseten a DAILYLOOP nem kell: a job futtassa ezt a ket sort:
+==     LOAD /KEEP 1/ $DATA.EMSRPT.NAPI
+==     DAILYRPT
+==
+== A BEALLITASOK reszben (napi^cfg) ird at a fajlneveket a sajatodra!
+== ==================================================================
+
+?SECTION napi^cfg MACRO
+== ---------------------- BEALLITASOK ----------------------
+#SET napi^ptlf   $DATA.PTLF                 == PTLF subvolume (POyymmdd)
+#SET napi^tlf    $DATA.TLF                  == TLF subvolume (TLyymmdd)
+#SET napi^prog   $DATA.EMSRPT               == PTLFRPT, TLFRPT, EMSSCAN helye
+#SET napi^emslib $DATA.EMSRPT.EMSERR        == EMSERR makro konyvtar
+#SET napi^ora    0600                       == DAILYLOOP: futas ideje (hhmm)
+#SET napi^stopf  $DATA.EMSRPT.STOPNAPI      == DAILYLOOP: stop-fajl
+
+?SECTION napi^tegnap MACRO
+== tegnapi datum beallitasa: napi^nap = yyyy-mm-dd, napi^ymd = yymmdd
+#PUSH ts dt jd yy mo dd y2
+#SET ts [#JULIANTIMESTAMP]
+#SET ts [#COMPUTE ts - 86400000000]
+#SET dt [#INTERPRETTIMESTAMP [ts]]
+SINK [#SETMANY jd yy mo dd , [dt]]
+[#IF mo < 10 |THEN| #SET mo 0[mo]]
+[#IF dd < 10 |THEN| #SET dd 0[dd]]
+#SET y2 [#COMPUTE yy - 2000]
+[#IF y2 < 10 |THEN| #SET y2 0[y2]]
+#SET napi^nap [yy]-[mo]-[dd]
+#SET napi^ymd [y2][mo][dd]
+#POP ts dt jd yy mo dd y2
+
+?SECTION dailyrpt MACRO
+#FRAME
+#PUSH napi^ptlf napi^tlf napi^prog napi^emslib napi^ora napi^stopf
+#PUSH napi^nap napi^ymd pf tf y2 mo dd
+napi^cfg
+
+== nap: parameter (yyyy-mm-dd), vagy tegnap
+#SET napi^nap %1%
+[#IF [#EMPTYV napi^nap] |THEN|
+  napi^tegnap
+|ELSE|
+  == yyyy-mm-dd -> yymmdd
+  #SET y2 [#CHARGET napi^nap 3 TO 4]
+  #SET mo [#CHARGET napi^nap 6 TO 7]
+  #SET dd [#CHARGET napi^nap 9 TO 10]
+  #SET napi^ymd [y2][mo][dd]
+]
+
+#OUTPUT DAILYRPT: [napi^nap] ([napi^ymd]) - indul: [#CONTIME [#TIMESTAMP]]
+
+== 1. POS riport
+#SET pf [napi^ptlf].PO[napi^ymd]
+[#IF [#FILEINFO /EXISTENCE/ [pf]] |THEN|
+  RUN [napi^prog].PTLFRPT /OUT $S.#B24NAPI.POS/ [pf]
+  #OUTPUT DAILYRPT: POS riport kesz ([pf])
+|ELSE|
+  #OUTPUT DAILYRPT: HIANYZIK a PTLF fajl: [pf]
+]
+
+== 2. ATM riport
+#SET tf [napi^tlf].TL[napi^ymd]
+[#IF [#FILEINFO /EXISTENCE/ [tf]] |THEN|
+  RUN [napi^prog].TLFRPT /OUT $S.#B24NAPI.ATM/ [tf]
+  #OUTPUT DAILYRPT: ATM riport kesz ([tf])
+|ELSE|
+  #OUTPUT DAILYRPT: HIANYZIK a TLF fajl: [tf]
+]
+
+== 3. EMS hibakereses
+LOAD /KEEP 1/ [napi^emslib]
+EMSERR [napi^nap]
+
+#OUTPUT DAILYRPT: [napi^nap] - vege: [#CONTIME [#TIMESTAMP]]
+#UNFRAME
+
+?SECTION dailyloop MACRO
+#FRAME
+#PUSH napi^ptlf napi^tlf napi^prog napi^emslib napi^ora napi^stopf
+#PUSH most hh mi kesz ma yy mo dd
+napi^cfg
+#SET kesz 0
+#OUTPUT DAILYLOOP: indul, futas minden nap [napi^ora] utan, stop: [napi^stopf]
+
+[#LOOP |WHILE| NOT [#FILEINFO /EXISTENCE/ [napi^stopf]] |DO|
+  == helyi ido: "yyyy mm dd hh mm ss cc"
+  SINK [#SETMANY yy mo dd hh mi , [#CONTIME [#TIMESTAMP]]]
+  #SET ma [#COMPUTE yy * 10000 + mo * 100 + dd]
+  #SET most [#COMPUTE hh * 100 + mi]
+  [#IF most >= napi^ora AND ma <> kesz |THEN|
+    DAILYRPT
+    #SET kesz [ma]
+  ]
+  #DELAY 30000                       == 5 perc (szazadmasodpercben)
+]
+
+#OUTPUT DAILYLOOP: leallitva ([napi^stopf] letezik)
+#UNFRAME
