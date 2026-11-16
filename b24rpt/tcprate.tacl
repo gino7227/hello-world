@@ -40,14 +40,24 @@ climcmd /OUT [climv^tmp]/ %2 TO *%
   FUP /OUTV %1%/ COPY [climv^tmp]
 ]
 
+?SECTION climf MACRO
+== CLIMF fajl clim parancs...
+== A climcmd kimenete fajlba; ezt a TCPRATE program maga olvassa be (@@F),
+== mert a FUP COPY a hosszu rekordok veget levagna.
+[#IF [#FILEINFO /EXISTENCE/ %1%] |THEN|
+  FUP /OUTV climv^junk/ PURGE %1%!
+]
+climcmd /OUT %1%/ %2 TO *%
+
 ?SECTION tcprate MACRO
 #FRAME
 #PUSH clims prog port ns sec perc rsz pairs all out nl rest cl nsn ln i k pass
-#PUSH climv^tmp climv^junk
+#PUSH climv^tmp climv^junk climv^sv kk ctf
 == ---------------------- BEALLITASOK ----------------------
 #SET clims nclim000 nclim001          == CLIM-ek, szokozzel elvalasztva
 #SET prog  $DATA.EMSRPT.TCPRATE       == a TCPRATE program
 #SET climv^tmp $DATA.EMSRPT.CLIMTMP   == munkafajl a climcmd kimenetehez
+#SET climv^sv  $DATA.EMSRPT            == ide kerulnek a CTpkk munkafajlok
 == ---------------------------------------------------------
 #SET port %1%
 #SET perc %2%
@@ -92,10 +102,13 @@ climcmd /OUT [climv^tmp]/ %2 TO *%
     #SET k 1
     [#LOOP |WHILE| k <= [#LINECOUNT pairs] |DO|
       SINK [#SETMANY cl nsn , [#LINEGET pairs k]]
-      CLIMV out [cl] ip netns exec [nsn] ss -tin &
+      #SET kk [k]
+      [#IF k < 10 |THEN| #SET kk 0[k]]
+      #SET ctf [climv^sv].CT[pass][kk]
+      CLIMF [ctf] [cl] ip netns exec [nsn] ss -tin &
         dport = :[port] or sport = :[port]
       #APPEND all @@S [pass] [cl] [nsn]
-      #APPENDV all out
+      #APPEND all @@F [ctf]
       #SET k [#COMPUTE k + 1]
     ]
     [#IF pass = 1 |THEN|

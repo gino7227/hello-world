@@ -7,6 +7,7 @@
  * Bemenet (soronkent):
  *   @@T <menet> <JULIANTIMESTAMP>          a menet kezdete (1 vagy 2)
  *   @@S <menet> <clim> <namespace>         egy ss kimenet kezdete
+ *   @@F <fajl>                             az ss kimenet a climcmd munkafajljaban
  *   ... az ss -tin kimenete ...
  *
  *   @@D <menet> yyyy mm dd hh mm ss cc     ugyanez helyi idoben (#CONTIME)
@@ -33,7 +34,7 @@
 #include <cextdecs(FILE_OPEN_,READX,WRITEX,FILE_GETINFO_,FILE_CLOSE_)>
 #endif
 
-#define TCPRATE_VER "2026-11-16 v5 (tordeles-turo)"
+#define TCPRATE_VER "2026-11-16 v6 (munkafajl)"
 #define MAXLINE   8192
 #define MAXCONN   2000
 #define MAXPEER   200
@@ -317,6 +318,44 @@ static void set_time_text(int p, const char *s)
   }
 }
 
+/* climcmd altal irt munkafajl soronkenti beolvasasa, teljes rekordhosszal.
+   EDIT (101) fajlt a C futtatokornyezet fopen()-nel olvas; ha az nem megy
+   (pl. entry-sequenced fajl), Guardianon FILE_OPEN_/READX. */
+static void read_climfile(const char *fn)
+{
+  static char ln[MAXLINE];
+  FILE *f = fopen(fn, "r");
+  if (f) {
+    while (fgets(ln, MAXLINE, f)) {
+      ln[strcspn(ln, "\r\n")] = 0;
+      if (!strncmp(ln, "Termination Info", 16)) continue;
+      blk_add(ln);
+    }
+    fclose(f);
+    return;
+  }
+#ifdef __TANDEM
+  {
+    short fnum2 = -1, err;
+    unsigned short cnt;
+    err = FILE_OPEN_(fn, (short)strlen(fn), &fnum2, 1, 0);
+    if (err) { fprintf(stderr, "Nem olvashato: %s (hiba %d)\n", fn, err); return; }
+    for (;;) {
+      cnt = 0; err = 0;
+      READX(fnum2, ln, (unsigned short)(MAXLINE - 1), &cnt);
+      FILE_GETINFO_(fnum2, &err);
+      if (err) break;
+      ln[cnt] = 0;
+      if (!strncmp(ln, "Termination Info", 16)) continue;
+      blk_add(ln);
+    }
+    FILE_CLOSE_(fnum2);
+  }
+#else
+  fprintf(stderr, "Nem olvashato: %s\n", fn);
+#endif
+}
+
 /* ---------- bemenet beolvasasa (stdin = TACL /INV/) ---------- */
 static void read_input(void)
 {
@@ -339,6 +378,11 @@ static void read_input(void)
       cur_clim[0] = cur_ns[0] = 0;
       sscanf(ln + 4, "%d %16s %32s", &dummy, cur_clim, cur_ns);
       if (!cur_pass) cur_pass = npass ? npass : 1;
+      continue;
+    }
+    if (!strncmp(ln, "@@F ", 4)) {          /* climcmd munkafajl: kozvetlen olvasas */
+      char fn[256];
+      if (sscanf(ln + 4, "%255s", fn) == 1 && cur_pass) read_climfile(fn);
       continue;
     }
     if (!strncmp(ln, "Termination Info", 16)) continue;
