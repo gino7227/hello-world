@@ -4,40 +4,46 @@
 ==
 == Hasznalat:
 ==   LOAD /KEEP 1/ $DATA.EMSRPT.TCPRMAC
-==   TCPRATE port [namespace] [mp]
+==   TCPRATE port [perc] [namespace] [R]
 ==
 ==   port       a figyelt port (pl. 4275 = ATM, 7000 = HSM); mindket
 ==              iranyt nezi (dport es sport), igy mindegy, ki a szerver
-==   namespace  CLIM hálozati nevter (pl. NMLNS005); ha nincs megadva
+==   perc       meresi ido percben (alap: 5); a makro most indul, ennyit
+==              var, es utana irja ki, mennyi uzenet ment at a porton
+==   namespace  CLIM halozati nevter (pl. NMLNS005); ha nincs megadva
 ==              vagy *, akkor a CLIM-ek osszes nevteret vegignezi
-==   mp         meresi ido masodpercben (alap: 60)
+==   R          reszletes kimenet kapcsolatonkent is
 ==
 == Peldak:
-==   TCPRATE 4275                 == ATM, minden nevter, 60 mp
-==   TCPRATE 7000 NMLNS006        == HSM, adott nevter
-==   TCPRATE 4275 * 30            == minden nevter, 30 mp
+==   TCPRATE 4275                 == ATM, 5 perc
+==   TCPRATE 7000 1               == HSM, 1 perc
+==   TCPRATE 4275 10 * R          == ATM, 10 perc, reszletesen
+==   TCPRATE 7000 5 NMLNS006      == HSM, 5 perc, adott nevter
 ==
 == Mukodes: ket pillanatkep (climcmd ... ss -tin) a megadott ido
-== kulonbseggel, majd a TCPRATE program kiszamolja a kapcsolatonkenti
-== uzenet/mp erteket (data_segs_in/out kulonbseg).
+== kulonbseggel, majd a TCPRATE program kiszamolja, hany uzenet
+== (data_segs_in/out kulonbseg) ment at a porton a meres alatt.
+== Visszamenoleg nem lehet merni: a CLIM csak osszesitett szamlalot ad.
 ==
 == A BEALLITASOK reszben add meg a CLIM-ek nevet es a program helyet!
 == ==================================================================
 ?SECTION tcprate MACRO
 #FRAME
-#PUSH clims prog port ns sec pairs all out nl rest cl nsn ln i k pass
+#PUSH clims prog port ns sec perc rsz pairs all out nl rest cl nsn ln i k pass
 == ---------------------- BEALLITASOK ----------------------
 #SET clims nclim000 nclim001          == CLIM-ek, szokozzel elvalasztva
 #SET prog  $DATA.EMSRPT.TCPRATE       == a TCPRATE program
 == ---------------------------------------------------------
 #SET port %1%
-#SET ns   %2%
-#SET sec  %3%
-[#IF [#EMPTYV sec] |THEN| #SET sec 60]
+#SET perc %2%
+#SET ns   %3%
+#SET rsz  %4%
+[#IF [#EMPTYV perc] |THEN| #SET perc 5]
 [#IF [#EMPTYV ns] |THEN| #SET ns *]
+#SET sec [#COMPUTE perc * 60]
 
 [#IF [#EMPTYV port] |THEN|
-  #OUTPUT Hasznalat: TCPRATE port [namespace] [mp]
+  #OUTPUT Hasznalat: TCPRATE port [perc] [namespace] [R]
 |ELSE|
 
   == 1. CLIM / nevter parok osszegyujtese
@@ -62,12 +68,13 @@
       #APPEND pairs [cl] [ns]
     ]
   ]
-  #OUTPUT TCPRATE: port [port], [sec] mp, [#LINECOUNT pairs] CLIM/nevter
+  #OUTPUT TCPRATE: port [port], [perc] perc meres indul ([#LINECOUNT pairs] CLIM/nevter)
 
   == 2. ket pillanatkep
   #SET pass 1
   [#LOOP |WHILE| pass <= 2 |DO|
     #APPEND all @@T [pass] [#JULIANTIMESTAMP]
+    #APPEND all @@D [pass] [#CONTIME [#TIMESTAMP]]
     #SET k 1
     [#LOOP |WHILE| k <= [#LINECOUNT pairs] |DO|
       SINK [#SETMANY cl nsn , [#LINEGET pairs k]]
@@ -79,13 +86,13 @@
       #SET k [#COMPUTE k + 1]
     ]
     [#IF pass = 1 |THEN|
-      #OUTPUT TCPRATE: elso meres kesz, varakozas [sec] mp ...
+      #OUTPUT TCPRATE: varakozas [perc] percig ...
       #DELAY [#COMPUTE sec * 100]
     ]
     #SET pass [#COMPUTE pass + 1]
   ]
 
   == 3. kiertekeles
-  RUN [prog] /INV all/ [port] [sec]
+  RUN [prog] /INV all/ [port] [sec] [rsz]
 ]
 #UNFRAME

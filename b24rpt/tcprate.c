@@ -9,13 +9,14 @@
  *   @@S <menet> <clim> <namespace>         egy ss kimenet kezdete
  *   ... az ss -tin kimenete ...
  *
- * Parameterek: port [meresi-ido-mp]
+ *   @@D <menet> yyyy mm dd hh mm ss cc     ugyanez helyi idoben (#CONTIME)
+ *
+ * Parameterek: port [meresi-ido-mp] [R]
  *
  * Kimenet (max. 79 oszlop):
- *   A) kapcsolatonkent: uzenet/mp be es ki (data_segs_in/out kulonbseg),
- *      rtt, minrtt, Send-Q, utolso fogadas, ujrakuldes, figyelmeztetesek
- *   B) tuloldali IP-cimenkent osszesitve
- *   C) mindosszesen
+ *   rovid osszefoglalo: a meresi idoszakban beerkezett es kimeno uzenetek
+ *   szama, kapcsolatok szama, megoszlas tuloldalankent, allapot
+ *   R parameterrel ezen felul: kapcsolatonkenti es tuloldal szerinti reszletek
  */
 
 #include <stdio.h>
@@ -216,20 +217,31 @@ static int cmp_conn(const void *a, const void *b)
   return r;
 }
 
+/* "@@D <menet> yyyy mm dd hh mm ss cc" (TACL #CONTIME) -> "yyyy.mm.dd hh:mm:ss" */
+static char t_text[3][24];
+static void set_time_text(const char *s)
+{
+  int p, y, mo, d, h, mi, se;
+  if (sscanf(s, "%d %d %d %d %d %d %d", &p, &y, &mo, &d, &h, &mi, &se) == 7 && p >= 1 && p <= 2)
+    sprintf(t_text[p], "%04d.%02d.%02d %02d:%02d:%02d", y, mo, d, h, mi, se);
+}
+
 int main(int argc, char *argv[])
 {
   static char ln[MAXLINE];
-  double el, tin = 0, tout = 0, tkbin = 0, tkbout = 0;
-  int i, nwarn = 0;
+  double el;
+  long long tin = 0, tout = 0, tbin = 0, tbout = 0;
+  int i, k, nwarn = 0, n_sq = 0, n_cs = 0, n_rt = 0, n_new = 0, n_gone = 0, detail = 0;
   char a[32], b[32], c[32], d[32], e[32];
   char last_grp[64] = "";
 
   if (argc < 2) {
-    fprintf(stderr, "Hasznalat: TCPRATE port [mp]   (a bemenet: RUN /INV valtozo/)\n");
+    fprintf(stderr, "Hasznalat: TCPRATE port [mp] [R]   (a bemenet: RUN /INV valtozo/)\n");
     return 2;
   }
   port = atoi(argv[1]);
   if (argc > 2) sec_param = atof(argv[2]);
+  if (argc > 3 && (argv[3][0] == 'R' || argv[3][0] == 'r')) detail = 1;
 
   while (fgets(ln, MAXLINE, stdin)) {
     ln[strcspn(ln, "\r\n")] = 0;
@@ -239,6 +251,7 @@ int main(int argc, char *argv[])
       if (q && p >= 1 && p <= 2) t_snap[p] = to_ll(q + 1);
       continue;
     }
+    if (!strncmp(ln, "@@D ", 4)) { set_time_text(ln + 4); continue; }
     if (!strncmp(ln, "@@S ", 4)) {
       blk_flush();
       cur_clim[0] = cur_ns[0] = 0;
@@ -253,17 +266,67 @@ int main(int argc, char *argv[])
 
   el = (t_snap[1] && t_snap[2] > t_snap[1]) ? (t_snap[2] - t_snap[1]) / 1e6 : sec_param;
   if (el <= 0) el = 1;
-
   qsort(conn, n_conn, sizeof(Conn), cmp_conn);
 
+  /* ---- osszesites: uzenetek szama a meresi idoszakban ---- */
+  for (i = 0; i < n_conn; i++) {
+    Conn *x = &conn[i];
+    char ip[40];
+    long long din = 0, dout = 0, dbin = 0, dbout = 0;
+    if (x->seen[1] && x->seen[2]) {
+      din = x->dsi[2] - x->dsi[1];   dout = x->dso[2] - x->dso[1];
+      dbin = x->brecv[2] - x->brecv[1]; dbout = x->bsent[2] - x->bsent[1];
+      if (x->sendq > 0) n_sq++;
+      if (x->lastrcv > 60000) n_cs++;
+      if (x->bretr[2] > x->bretr[1]) n_rt++;
+    } else if (x->seen[2]) {          /* kozben letrejott: minden forgalma ide tartozik */
+      din = x->dsi[2]; dout = x->dso[2]; dbin = x->brecv[2]; dbout = x->bsent[2];
+      n_new++;
+    } else n_gone++;
+    tin += din; tout += dout; tbin += dbin; tbout += dbout;
+    ip_of(x->peer, ip);
+    for (k = 0; k < n_peer; k++) if (!strcmp(peers[k].ip, ip)) break;
+    if (k == n_peer && n_peer < MAXPEER) { memset(&peers[k], 0, sizeof(Peer)); strcpy(peers[k].ip, ip); n_peer++; }
+    if (k < n_peer) {
+      peers[k].n++;
+      peers[k].in += din; peers[k].out += dout;
+      peers[k].kbin += dbin / 1024.0; peers[k].kbout += dbout / 1024.0;
+    }
+  }
+
+  /* ---- rovid osszefoglalo (alapertelmezes) ---- */
   printf("\n");
   line(RPT_W, '=');
-  printf("TCP FORGALOM - port %d, meresi ido %s mp\n", port, fmt_d(el, 1, a));
-  printf("Be = a NonStop fele erkezo, Ki = a NonStoprol kimeno adatszegmens\n");
-  printf("(kis uzeneteknel 1 szegmens ~ 1 uzenet)\n");
+  if (t_text[1][0] && t_text[2][0])
+    printf("Port %d forgalma: %s - %s (%s perc)\n", port, t_text[1], t_text[2] + 11,
+           fmt_d(el / 60.0, 1, a));
+  else
+    printf("Port %d forgalma az elmult %s percben\n", port, fmt_d(el / 60.0, 1, a));
   line(RPT_W, '=');
+  printf("Beerkezo uzenet (a NonStop fele): %12s   (%s / mp)\n", fmt_n(tin, a), fmt_d(tin / el, 1, b));
+  printf("Kimeno uzenet (a NonStoprol):     %12s   (%s / mp)\n", fmt_n(tout, a), fmt_d(tout / el, 1, b));
+  printf("Kapcsolatok szama:                %12d\n", n_conn - n_gone);
+  if (n_peer > 1) {
+    printf("Megoszlas:");
+    for (k = 0; k < n_peer; k++) {
+      double sh = (tin + tout) > 0 ? 100.0 * (peers[k].in + peers[k].out) / (double)(tin + tout) : 0;
+      printf("%s %s %s%%", k ? "," : "", peers[k].ip, fmt_d(sh, 0, a));
+    }
+    printf("\n");
+  }
+  if (!n_conn) printf("FIGYELEM: nincs kapcsolat ezen a porton!\n");
+  else if (!n_sq && !n_cs && !n_rt && !n_gone) printf("Allapot: rendben\n");
+  else {
+    if (n_sq) printf("FIGYELEM: %d kapcsolaton nyugtazatlan adat all sorban\n", n_sq);
+    if (n_cs) printf("FIGYELEM: %d kapcsolaton 1 percnel regebben jott adat\n", n_cs);
+    if (n_rt) printf("Megjegyzes: %d kapcsolaton volt ujrakuldes\n", n_rt);
+    if (n_gone) printf("Megjegyzes: %d kapcsolat megszunt a meres alatt\n", n_gone);
+  }
+  if (n_new) printf("Megjegyzes: %d uj kapcsolat jott letre a meres alatt\n", n_new);
+  if (!detail) return 0;
 
-  printf("\nA) Kapcsolatok\n");
+  /* ---- reszletes (R parameter) ---- */
+  printf("\nReszletek (Be/Ki = adatszegmens/mp; kis uzeneteknel 1 szegmens ~ 1 uzenet)\n");
   printf("%-22s%7s%7s%7s%7s%6s%8s%5s %s\n", "Tuloldal", "Be/mp", "Ki/mp", "rtt",
          "minrtt", "SendQ", "Utolso", "Retr", "Megj.");
   line(RPT_W, '-');
@@ -272,7 +335,6 @@ int main(int argc, char *argv[])
     char grp[64], ip[40], note[32] = "";
     double rin = 0, rout = 0;
     long long retr = 0;
-    int k;
     sprintf(grp, "%s / %s", x->clim, x->ns);
     if (strcmp(grp, last_grp)) {
       printf("%s  (helyi: %s)\n", grp, x->local);
@@ -296,43 +358,20 @@ int main(int argc, char *argv[])
            x->sendq,
            x->seen[2] ? (sprintf(e, "%lds", x->lastrcv / 1000), e) : "-",
            retr > 0 ? (sprintf(ip, "%lld", retr), ip) : "-", note);
-
-    /* tuloldali IP szerinti osszesites */
-    ip_of(x->peer, ip);
-    for (k = 0; k < n_peer; k++) if (!strcmp(peers[k].ip, ip)) break;
-    if (k == n_peer && n_peer < MAXPEER) { memset(&peers[k], 0, sizeof(Peer)); strcpy(peers[k].ip, ip); n_peer++; }
-    if (k < n_peer) {
-      peers[k].n++;
-      peers[k].in += rin; peers[k].out += rout;
-      if (x->seen[1] && x->seen[2]) {
-        peers[k].kbin += (x->brecv[2] - x->brecv[1]) / el / 1024.0;
-        peers[k].kbout += (x->bsent[2] - x->bsent[1]) / el / 1024.0;
-      }
-    }
   }
-  if (!n_conn) printf("  nincs kapcsolat ezen a porton\n");
   line(RPT_W, '-');
   printf("rtt/minrtt ms; Utolso = mp az utolso fogadas ota; Retr = ujrakuldott bajt\n");
   printf("Megj.: SQ = nyugtazatlan adat all sorban, CS = 60 mp-nel regebben jott\n");
   printf("adat (csend), RT = volt ujrakuldes, UJ / MSZ = kozben jott letre / szunt meg\n");
 
-  printf("\nB) Tuloldal szerint\n");
-  printf("%-24s%6s%9s%9s%9s%9s%8s\n", "IP-cim", "Kapcs", "Be/mp", "Ki/mp", "Be KB/s", "Ki KB/s", "Arany");
+  printf("\nTuloldal szerint (a meresi idoszakban)\n");
+  printf("%-24s%6s%11s%11s%9s%9s\n", "IP-cim", "Kapcs", "Be (db)", "Ki (db)", "Be KB", "Ki KB");
   line(RPT_W, '-');
-  for (i = 0; i < n_peer; i++) { tin += peers[i].in; tout += peers[i].out; tkbin += peers[i].kbin; tkbout += peers[i].kbout; }
-  for (i = 0; i < n_peer; i++) {
-    double sh = (tin + tout) > 0 ? 100.0 * (peers[i].in + peers[i].out) / (tin + tout) : 0;
-    printf("%-24.24s%6d%9s%9s%9s%9s%7s%%\n", peers[i].ip, peers[i].n,
-           fmt_d(peers[i].in, 1, a), fmt_d(peers[i].out, 1, b),
-           fmt_d(peers[i].kbin, 1, c), fmt_d(peers[i].kbout, 1, d), fmt_d(sh, 1, e));
-  }
+  for (k = 0; k < n_peer; k++)
+    printf("%-24.24s%6d%11s%11s%9s%9s\n", peers[k].ip, peers[k].n,
+           fmt_n((long long)peers[k].in, a), fmt_n((long long)peers[k].out, b),
+           fmt_d(peers[k].kbin, 0, c), fmt_d(peers[k].kbout, 0, d));
   line(RPT_W, '-');
-
-  printf("\nC) Osszesen\n");
-  printf("Kapcsolatok: %d, figyelmeztetes: %d\n", n_conn, nwarn);
-  printf("Be:  %s uzenet/mp  (%s/perc), %s KB/s\n", fmt_d(tin, 1, a),
-         fmt_n((long long)(tin * 60 + 0.5), b), fmt_d(tkbin, 1, c));
-  printf("Ki:  %s uzenet/mp  (%s/perc), %s KB/s\n", fmt_d(tout, 1, a),
-         fmt_n((long long)(tout * 60 + 0.5), b), fmt_d(tkbout, 1, c));
+  printf("Osszesen: %s KB be, %s KB ki\n", fmt_d(tbin / 1024.0, 0, a), fmt_d(tbout / 1024.0, 0, b));
   return 0;
 }

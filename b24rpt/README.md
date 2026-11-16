@@ -97,19 +97,21 @@ NetBatch esetén a job egyszerűen: `LOAD /KEEP 1/ $DATA.EMSRPT.NAPI` majd `DAIL
 
 ---
 
-# TCPRATE – egy port TCP-forgalma a CLIM-eken (`tcprate.tacl` + `tcprate.c`)
+# TCPRATE – egy port forgalma a CLIM-eken (`tcprate.tacl` + `tcprate.c`)
 
 ```
 LOAD /KEEP 1/ $DATA.EMSRPT.TCPRMAC
-TCPRATE 4275                 == ATM, minden névtér, 60 mp
-TCPRATE 7000 NMLNS006        == HSM, adott névtér
-TCPRATE 4275 * 30            == minden névtér, 30 mp
+TCPRATE 4275                 == ATM, 5 perc mérés
+TCPRATE 7000 1               == HSM, 1 perc
+TCPRATE 4275 10 * R          == ATM, 10 perc, részletesen
+TCPRATE 7000 5 NMLNS006      == HSM, 5 perc, adott névtér
 ```
-- Mindkét irányt nézi (`dport` és `sport`), így mindegy, hogy a BASE24 a szerver vagy a kliens.
-- Névtér nélkül (vagy `*`) a beállított CLIM-ek összes névterét végignézi (`ip netns list`).
-- Két pillanatkép (`climcmd … ip netns exec <ns> ss -tin`) a megadott idő különbséggel; a `TCPRATE`
-  program kapcsolatonként kiszámolja az üzenet/mp értéket (`data_segs_in/out` különbség), és jelzi:
-  `SQ` (Send-Q > 0), `CS` (60 mp-nél régebben jött adat), `RT` (újraküldés), `UJ`/`MSZ`.
-- Összesítés túloldali IP-cím szerint (terheléselosztás) és mindösszesen.
+A makró most indítja a mérést, a megadott ideig vár, majd kiírja, hány üzenet jött be és ment ki
+a porton, hány kapcsolat van, hogyan oszlik meg a forgalom a túloldali gépek között, és rendben
+van-e minden. Visszamenőleg nem lehet mérni, mert a CLIM csak összesített számlálókat ad.
+
+- Mindkét irányt nézi (`dport` és `sport`); névtér nélkül (vagy `*`) a beállított CLIM-ek összes
+  névterét végignézi (`ip netns list`).
+- `R`: kapcsolatonkénti részletek (rtt, Send-Q, utolsó fogadás, újraküldés) és túloldal szerinti bontás.
 
 A CLIM-ek nevét és a program helyét a makró BEÁLLÍTÁSOK részében kell megadni.
