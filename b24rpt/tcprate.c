@@ -11,7 +11,12 @@
  *
  *   @@D <menet> yyyy mm dd hh mm ss cc     ugyanez helyi idoben (#CONTIME)
  *
- * Parameterek: port [meresi-ido-mp] [R]
+ * Uzemmodok:
+ *   TCPRATE port [mp] [R]                 egy meres (TCPRATE makro)
+ *   TCPRATE L naplo port:nev [port:nev..] naplosor portonkent (DAILYLOOP, 5 perc)
+ *   TCPRATE D naplo                       orankenti riport a napi naplobol
+ *
+ * A menet sorszamat a @@T sorok sorrendje adja (elso = 1, masodik = 2).
  *
  * Kimenet (max. 79 oszlop):
  *   rovid osszefoglalo: a meresi idoszakban beerkezett es kimeno uzenetek
@@ -23,6 +28,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+
+#ifdef __TANDEM
+#include <cextdecs(FILE_OPEN_,READX,WRITEX,FILE_GETINFO_,FILE_CLOSE_)>
+#endif
 
 #define MAXLINE   8192
 #define MAXCONN   2000
@@ -157,10 +166,21 @@ static void blk_flush(void)
   buf[0] = 0; p = buf;
   for (i = 0; i < blk_n; i++) {
     size_t L = strlen(blk[i]);
+    int glue = 0;
     memcpy(p, blk[i], L); p += L;
-    if (!(wrapw && (int)L == wrapw)) *p++ = ' ';
-    free(blk[i]);
+    /* teljes szelessegu sor: a kovetkezo a folytatasa, kiveve ha uj
+       kapcsolat (allapot-szoval kezdodo) sor jon */
+    if (wrapw && (int)L == wrapw && i + 1 < blk_n) {
+      char first[16]; int k = 0;
+      while (blk[i + 1][k] && !isspace((unsigned char)blk[i + 1][k]) && k < 15) {
+        first[k] = blk[i + 1][k]; k++;
+      }
+      first[k] = 0;
+      if (!is_state(first)) glue = 1;
+    }
+    if (!glue) *p++ = ' ';
   }
+  for (i = 0; i < blk_n; i++) free(blk[i]);
   *p = 0;
   blk_n = 0;
 
@@ -217,73 +237,266 @@ static int cmp_conn(const void *a, const void *b)
   return r;
 }
 
-/* "@@D <menet> yyyy mm dd hh mm ss cc" (TACL #CONTIME) -> "yyyy.mm.dd hh:mm:ss" */
-static char t_text[3][24];
-static void set_time_text(const char *s)
+/* "@@D <menet> yyyy mm dd hh mm ss cc" (TACL #CONTIME) */
+static char t_text[3][24];       /* "yyyy.mm.dd hh:mm:ss" */
+static char t_iso[3][24];        /* "yyyy-mm-dd hh:mm:ss" (naplo) */
+static void set_time_text(int p, const char *s)
 {
-  int p, y, mo, d, h, mi, se;
-  if (sscanf(s, "%d %d %d %d %d %d %d", &p, &y, &mo, &d, &h, &mi, &se) == 7 && p >= 1 && p <= 2)
+  int q, y, mo, d, h, mi, se;
+  if (p < 1 || p > 2) return;
+  if (sscanf(s, "%d %d %d %d %d %d %d", &q, &y, &mo, &d, &h, &mi, &se) == 7) {
     sprintf(t_text[p], "%04d.%02d.%02d %02d:%02d:%02d", y, mo, d, h, mi, se);
+    sprintf(t_iso[p], "%04d-%02d-%02d %02d:%02d:%02d", y, mo, d, h, mi, se);
+  }
 }
 
-int main(int argc, char *argv[])
+/* ---------- bemenet beolvasasa (stdin = TACL /INV/) ---------- */
+static void read_input(void)
 {
   static char ln[MAXLINE];
-  double el;
-  long long tin = 0, tout = 0, tbin = 0, tbout = 0;
-  int i, k, nwarn = 0, n_sq = 0, n_cs = 0, n_rt = 0, n_new = 0, n_gone = 0, detail = 0;
-  char a[32], b[32], c[32], d[32], e[32];
-  char last_grp[64] = "";
-
-  if (argc < 2) {
-    fprintf(stderr, "Hasznalat: TCPRATE port [mp] [R]   (a bemenet: RUN /INV valtozo/)\n");
-    return 2;
-  }
-  port = atoi(argv[1]);
-  if (argc > 2) sec_param = atof(argv[2]);
-  if (argc > 3 && (argv[3][0] == 'R' || argv[3][0] == 'r')) detail = 1;
-
+  int npass = 0;
   while (fgets(ln, MAXLINE, stdin)) {
     ln[strcspn(ln, "\r\n")] = 0;
     if (!strncmp(ln, "@@T ", 4)) {
-      int p = atoi(ln + 4);
       const char *q = strchr(ln + 4, ' ');
-      if (q && p >= 1 && p <= 2) t_snap[p] = to_ll(q + 1);
+      blk_flush();
+      if (npass < 2) npass++;
+      cur_pass = npass;
+      if (q) t_snap[npass] = to_ll(q + 1);
       continue;
     }
-    if (!strncmp(ln, "@@D ", 4)) { set_time_text(ln + 4); continue; }
+    if (!strncmp(ln, "@@D ", 4)) { set_time_text(npass, ln + 4); continue; }
     if (!strncmp(ln, "@@S ", 4)) {
+      int dummy;
       blk_flush();
       cur_clim[0] = cur_ns[0] = 0;
-      sscanf(ln + 4, "%d %16s %32s", &cur_pass, cur_clim, cur_ns);
-      if (cur_pass < 1 || cur_pass > 2) cur_pass = 2;
+      sscanf(ln + 4, "%d %16s %32s", &dummy, cur_clim, cur_ns);
+      if (!cur_pass) cur_pass = npass ? npass : 1;
       continue;
     }
     if (!strncmp(ln, "Termination Info", 16)) continue;
     if (cur_pass) blk_add(ln);
   }
   blk_flush();
+}
+
+static int port_of(const char *addr)
+{
+  const char *c = strrchr(addr, ':');
+  return c ? atoi(c + 1) : -1;
+}
+
+/* egy port osszesitett forgalma a ket pillanatkep kozott */
+typedef struct {
+  long long in, out, bin, bout;
+  int conns, sq, cs, rt, gone, nw;
+} Stat;
+
+static void stat_port(int p, Stat *st)
+{
+  int i;
+  memset(st, 0, sizeof(Stat));
+  for (i = 0; i < n_conn; i++) {
+    Conn *x = &conn[i];
+    if (p > 0 && port_of(x->local) != p && port_of(x->peer) != p) continue;
+    if (x->seen[1] && x->seen[2]) {
+      st->in += x->dsi[2] - x->dsi[1];   st->out += x->dso[2] - x->dso[1];
+      st->bin += x->brecv[2] - x->brecv[1]; st->bout += x->bsent[2] - x->bsent[1];
+      st->conns++;
+      if (x->sendq > 0) st->sq++;
+      if (x->lastrcv > 60000) st->cs++;
+      if (x->bretr[2] > x->bretr[1]) st->rt++;
+    } else if (x->seen[2]) {          /* kozben letrejott: minden forgalma ide tartozik */
+      st->in += x->dsi[2]; st->out += x->dso[2];
+      st->bin += x->brecv[2]; st->bout += x->bsent[2];
+      st->conns++; st->nw++;
+    } else st->gone++;
+  }
+}
+
+/* ---------- naplofajl irasa / olvasasa ---------- */
+#ifdef __TANDEM
+static short lfnum = -1;
+static int log_open(const char *name, int write)
+{
+  short err = FILE_OPEN_(name, (short)strlen(name), &lfnum, (short)(write ? 2 : 1), 0);
+  if (err) { fprintf(stderr, "FILE_OPEN_ hiba %d: %s\n", err, name); return -1; }
+  return 0;
+}
+static int log_write(const char *s)
+{
+  short err = 0;
+  WRITEX(lfnum, (char *)s, (unsigned short)strlen(s));
+  FILE_GETINFO_(lfnum, &err);
+  if (err) { fprintf(stderr, "WRITEX hiba %d\n", err); return -1; }
+  return 0;
+}
+static int log_read(char *buf, int max)
+{
+  unsigned short cnt = 0; short err = 0;
+  READX(lfnum, buf, (unsigned short)(max - 1), &cnt);
+  FILE_GETINFO_(lfnum, &err);
+  if (err == 1) return 0;
+  if (err) { fprintf(stderr, "READX hiba %d\n", err); return -1; }
+  buf[cnt] = 0;
+  return 1;
+}
+static void log_close(void) { if (lfnum >= 0) FILE_CLOSE_(lfnum); }
+#else
+static FILE *lf;
+static int log_open(const char *name, int write)
+{
+  lf = fopen(name, write ? "a" : "r");
+  if (!lf) { perror(name); return -1; }
+  return 0;
+}
+static int log_write(const char *s) { fprintf(lf, "%s\n", s); return 0; }
+static int log_read(char *buf, int max)
+{
+  if (!fgets(buf, max, lf)) return 0;
+  buf[strcspn(buf, "\r\n")] = 0;
+  return 1;
+}
+static void log_close(void) { if (lf) fclose(lf); }
+#endif
+
+/* L uzemmod: portonkent egy naplosor
+   "yyyy-mm-dd hh:mm:ss port nev mp be ki kapcs sq cs rt megsz uj" */
+static int mode_log(int argc, char *argv[])
+{
+  int i; double el;
+  if (argc < 4) { fprintf(stderr, "Hasznalat: TCPRATE L naplo port:nev ...\n"); return 2; }
+  read_input();
+  if (!t_snap[1] || !t_snap[2]) return 0;      /* nincs elozo pillanatkep */
+  el = (t_snap[2] - t_snap[1]) / 1e6;
+  if (el <= 0) return 0;
+  if (log_open(argv[2], 1)) return 1;
+  for (i = 3; i < argc; i++) {
+    char nm[17] = "", rec[200], a[24];
+    int p = atoi(argv[i]);
+    const char *c = strchr(argv[i], ':');
+    Stat st;
+    if (c) sprintf(nm, "%.16s", c + 1); else sprintf(nm, "%d", p);
+    stat_port(p, &st);
+    sprintf(a, "%.0f", el);
+    sprintf(rec, "%s %d %s %s %lld %lld %d %d %d %d %d %d",
+            t_iso[2][0] ? t_iso[2] : "0000-00-00 00:00:00", p, nm, a,
+            st.in, st.out, st.conns, st.sq, st.cs, st.rt, st.gone, st.nw);
+    log_write(rec);
+    printf("%s\n", rec);
+  }
+  log_close();
+  return 0;
+}
+
+/* D uzemmod: orankenti riport a napi naplobol */
+#define MAXP 16
+typedef struct {
+  int port; char nm[17];
+  long long in[24], out[24];
+  double pk_in[24], pk_out[24];
+  int conns[24], warn[24], nsamp[24];
+} PortDay;
+static PortDay pd[MAXP]; static int n_pd;
+
+static int mode_daily(int argc, char *argv[])
+{
+  static char ln[512];
+  char day[16] = "", a[32], b[32], c[32], d[32];
+  int i, h, r;
+  if (argc < 3) { fprintf(stderr, "Hasznalat: TCPRATE D naplo\n"); return 2; }
+  if (log_open(argv[2], 0)) return 1;
+  while ((r = log_read(ln, sizeof ln)) > 0) {
+    char dt[16], tm[16], nm[17];
+    int p, el, conns, sq, cs, rt, gone, nw, k;
+    long long in, out;
+    char sin[32], sout[32];
+    if (sscanf(ln, "%15s %15s %d %16s %d %31s %31s %d %d %d %d %d %d", dt, tm, &p, nm, &el,
+               sin, sout, &conns, &sq, &cs, &rt, &gone, &nw) != 13) continue;
+    in = to_ll(sin); out = to_ll(sout);
+    h = atoi(tm);
+    if (h < 0 || h > 23 || el <= 0) continue;
+    if (!day[0]) strcpy(day, dt);
+    for (k = 0; k < n_pd; k++) if (pd[k].port == p) break;
+    if (k == n_pd) {
+      if (n_pd >= MAXP) continue;
+      memset(&pd[k], 0, sizeof(PortDay)); pd[k].port = p; strcpy(pd[k].nm, nm); n_pd++;
+    }
+    pd[k].in[h] += in; pd[k].out[h] += out;
+    if ((double)in / el > pd[k].pk_in[h]) pd[k].pk_in[h] = (double)in / el;
+    if ((double)out / el > pd[k].pk_out[h]) pd[k].pk_out[h] = (double)out / el;
+    if (conns > pd[k].conns[h]) pd[k].conns[h] = conns;
+    if (sq || cs || gone) pd[k].warn[h]++;
+    pd[k].nsamp[h]++;
+  }
+  log_close();
+
+  printf("\n");
+  line(RPT_W, '=');
+  printf("TCP FORGALOM ORANKENT %s\n", day);
+  printf("Forras:  %s (5 percenkenti meres)\n", argv[2]);
+  line(RPT_W, '=');
+  if (!n_pd) { printf("Nincs adat a naplofajlban.\n"); return 0; }
+  for (i = 0; i < n_pd; i++) {
+    long long tin = 0, tout = 0; double pk = 0; int pkh = -1, tw = 0, missing = 0;
+    printf("\nPort %d (%s)\n", pd[i].port, pd[i].nm);
+    printf("%-7s%11s%11s%8s%13s%6s%6s%6s\n", "Ora", "Be (db)", "Ki (db)", "Be/mp",
+           "Csucs Be/mp", "Kapcs", "Figy", "Meres");
+    line(RPT_W, '-');
+    for (h = 0; h < 24; h++) {
+      if (!pd[i].nsamp[h]) { missing++; continue; }
+      {
+        char w[16];
+        if (pd[i].warn[h]) sprintf(w, "%d", pd[i].warn[h]); else strcpy(w, "-");
+        printf("%02d-%02d  %11s%11s%8s%13s%6d%6s%6d\n", h, h + 1,
+               fmt_n(pd[i].in[h], a), fmt_n(pd[i].out[h], b),
+               fmt_d(pd[i].in[h] / 3600.0, 1, c), fmt_d(pd[i].pk_in[h], 1, d),
+               pd[i].conns[h], w, pd[i].nsamp[h]);
+      }
+      tin += pd[i].in[h]; tout += pd[i].out[h]; tw += pd[i].warn[h];
+      if (pd[i].pk_in[h] > pk) { pk = pd[i].pk_in[h]; pkh = h; }
+    }
+    line(RPT_W, '-');
+    printf("Osszesen: %s be, %s ki", fmt_n(tin, a), fmt_n(tout, b));
+    if (pkh >= 0) printf(", csucs %s be/mp (%02d-%02d ora)", fmt_d(pk, 1, c), pkh, pkh + 1);
+    printf("\n");
+    if (tw) printf("Figyelmeztetes %d meresnel (sorban allo adat, csend vagy megszunt kapcs.)\n", tw);
+    if (missing) printf("%d oranal nincs meres (pl. a DAILYLOOP nem futott)\n", missing);
+  }
+  printf("\nCsucs Be/mp = a legforgalmasabb 5 perc atlaga az adott oraban;\n");
+  printf("Meres = az oraban vegzett 5 perces meresek szama (teljes ora: 12)\n");
+  return 0;
+}
+
+/* ---------- egyszeri meres (TCPRATE makro) ---------- */
+static int mode_once(int argc, char *argv[])
+{
+  double el;
+  int i, k, nwarn = 0, detail = 0;
+  char a[32], b[32], c[32], d[32], e[32];
+  char last_grp[64] = "";
+  Stat st;
+
+  port = atoi(argv[1]);
+  if (argc > 2) sec_param = atof(argv[2]);
+  if (argc > 3 && (argv[3][0] == 'R' || argv[3][0] == 'r')) detail = 1;
+  read_input();
 
   el = (t_snap[1] && t_snap[2] > t_snap[1]) ? (t_snap[2] - t_snap[1]) / 1e6 : sec_param;
   if (el <= 0) el = 1;
   qsort(conn, n_conn, sizeof(Conn), cmp_conn);
+  stat_port(port, &st);
 
-  /* ---- osszesites: uzenetek szama a meresi idoszakban ---- */
+  /* tuloldal szerinti bontas */
   for (i = 0; i < n_conn; i++) {
     Conn *x = &conn[i];
     char ip[40];
     long long din = 0, dout = 0, dbin = 0, dbout = 0;
+    if (port_of(x->local) != port && port_of(x->peer) != port) continue;
     if (x->seen[1] && x->seen[2]) {
-      din = x->dsi[2] - x->dsi[1];   dout = x->dso[2] - x->dso[1];
+      din = x->dsi[2] - x->dsi[1]; dout = x->dso[2] - x->dso[1];
       dbin = x->brecv[2] - x->brecv[1]; dbout = x->bsent[2] - x->bsent[1];
-      if (x->sendq > 0) n_sq++;
-      if (x->lastrcv > 60000) n_cs++;
-      if (x->bretr[2] > x->bretr[1]) n_rt++;
-    } else if (x->seen[2]) {          /* kozben letrejott: minden forgalma ide tartozik */
-      din = x->dsi[2]; dout = x->dso[2]; dbin = x->brecv[2]; dbout = x->bsent[2];
-      n_new++;
-    } else n_gone++;
-    tin += din; tout += dout; tbin += dbin; tbout += dbout;
+    } else if (x->seen[2]) { din = x->dsi[2]; dout = x->dso[2]; dbin = x->brecv[2]; dbout = x->bsent[2]; }
     ip_of(x->peer, ip);
     for (k = 0; k < n_peer; k++) if (!strcmp(peers[k].ip, ip)) break;
     if (k == n_peer && n_peer < MAXPEER) { memset(&peers[k], 0, sizeof(Peer)); strcpy(peers[k].ip, ip); n_peer++; }
@@ -294,7 +507,6 @@ int main(int argc, char *argv[])
     }
   }
 
-  /* ---- rovid osszefoglalo (alapertelmezes) ---- */
   printf("\n");
   line(RPT_W, '=');
   if (t_text[1][0] && t_text[2][0])
@@ -303,29 +515,28 @@ int main(int argc, char *argv[])
   else
     printf("Port %d forgalma az elmult %s percben\n", port, fmt_d(el / 60.0, 1, a));
   line(RPT_W, '=');
-  printf("Beerkezo uzenet (a NonStop fele): %12s   (%s / mp)\n", fmt_n(tin, a), fmt_d(tin / el, 1, b));
-  printf("Kimeno uzenet (a NonStoprol):     %12s   (%s / mp)\n", fmt_n(tout, a), fmt_d(tout / el, 1, b));
-  printf("Kapcsolatok szama:                %12d\n", n_conn - n_gone);
+  printf("Beerkezo uzenet (a NonStop fele): %12s   (%s / mp)\n", fmt_n(st.in, a), fmt_d(st.in / el, 1, b));
+  printf("Kimeno uzenet (a NonStoprol):     %12s   (%s / mp)\n", fmt_n(st.out, a), fmt_d(st.out / el, 1, b));
+  printf("Kapcsolatok szama:                %12d\n", st.conns);
   if (n_peer > 1) {
     printf("Megoszlas:");
     for (k = 0; k < n_peer; k++) {
-      double sh = (tin + tout) > 0 ? 100.0 * (peers[k].in + peers[k].out) / (double)(tin + tout) : 0;
+      double sh = (st.in + st.out) > 0 ? 100.0 * (peers[k].in + peers[k].out) / (double)(st.in + st.out) : 0;
       printf("%s %s %s%%", k ? "," : "", peers[k].ip, fmt_d(sh, 0, a));
     }
     printf("\n");
   }
-  if (!n_conn) printf("FIGYELEM: nincs kapcsolat ezen a porton!\n");
-  else if (!n_sq && !n_cs && !n_rt && !n_gone) printf("Allapot: rendben\n");
+  if (!st.conns && !st.gone) printf("FIGYELEM: nincs kapcsolat ezen a porton!\n");
+  else if (!st.sq && !st.cs && !st.rt && !st.gone) printf("Allapot: rendben\n");
   else {
-    if (n_sq) printf("FIGYELEM: %d kapcsolaton nyugtazatlan adat all sorban\n", n_sq);
-    if (n_cs) printf("FIGYELEM: %d kapcsolaton 1 percnel regebben jott adat\n", n_cs);
-    if (n_rt) printf("Megjegyzes: %d kapcsolaton volt ujrakuldes\n", n_rt);
-    if (n_gone) printf("Megjegyzes: %d kapcsolat megszunt a meres alatt\n", n_gone);
+    if (st.sq) printf("FIGYELEM: %d kapcsolaton nyugtazatlan adat all sorban\n", st.sq);
+    if (st.cs) printf("FIGYELEM: %d kapcsolaton 1 percnel regebben jott adat\n", st.cs);
+    if (st.rt) printf("Megjegyzes: %d kapcsolaton volt ujrakuldes\n", st.rt);
+    if (st.gone) printf("Megjegyzes: %d kapcsolat megszunt a meres alatt\n", st.gone);
   }
-  if (n_new) printf("Megjegyzes: %d uj kapcsolat jott letre a meres alatt\n", n_new);
+  if (st.nw) printf("Megjegyzes: %d uj kapcsolat jott letre a meres alatt\n", st.nw);
   if (!detail) return 0;
 
-  /* ---- reszletes (R parameter) ---- */
   printf("\nReszletek (Be/Ki = adatszegmens/mp; kis uzeneteknel 1 szegmens ~ 1 uzenet)\n");
   printf("%-22s%7s%7s%7s%7s%6s%8s%5s %s\n", "Tuloldal", "Be/mp", "Ki/mp", "rtt",
          "minrtt", "SendQ", "Utolso", "Retr", "Megj.");
@@ -335,6 +546,7 @@ int main(int argc, char *argv[])
     char grp[64], ip[40], note[32] = "";
     double rin = 0, rout = 0;
     long long retr = 0;
+    if (port_of(x->local) != port && port_of(x->peer) != port) continue;
     sprintf(grp, "%s / %s", x->clim, x->ns);
     if (strcmp(grp, last_grp)) {
       printf("%s  (helyi: %s)\n", grp, x->local);
@@ -372,6 +584,19 @@ int main(int argc, char *argv[])
            fmt_n((long long)peers[k].in, a), fmt_n((long long)peers[k].out, b),
            fmt_d(peers[k].kbin, 0, c), fmt_d(peers[k].kbout, 0, d));
   line(RPT_W, '-');
-  printf("Osszesen: %s KB be, %s KB ki\n", fmt_d(tbin / 1024.0, 0, a), fmt_d(tbout / 1024.0, 0, b));
+  printf("Osszesen: %s KB be, %s KB ki\n", fmt_d(st.bin / 1024.0, 0, a), fmt_d(st.bout / 1024.0, 0, b));
   return 0;
+}
+
+int main(int argc, char *argv[])
+{
+  if (argc >= 2 && !strcmp(argv[1], "L")) return mode_log(argc, argv);
+  if (argc >= 2 && !strcmp(argv[1], "D")) return mode_daily(argc, argv);
+  if (argc < 2) {
+    fprintf(stderr, "Hasznalat: TCPRATE port [mp] [R]\n"
+                    "           TCPRATE L naplo port:nev [port:nev ...]\n"
+                    "           TCPRATE D naplo\n");
+    return 2;
+  }
+  return mode_once(argc, argv);
 }

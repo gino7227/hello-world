@@ -84,8 +84,13 @@ mindig találatok.
 
 - **`DAILYRPT [yyyy-mm-dd]`** – egy nap összes riportja (alap: tegnap): `PTLFRPT` → `$S.#B24NAPI.POS`,
   `TLFRPT` → `$S.#B24NAPI.ATM`, `EMSERR` → `$S.#EMSERR`. Hiányzó PTLF/TLF fájlt jelez, és továbblép.
-- **`DAILYLOOP`** – háttérben fut, minden nap a beállított időpont (alap 06:00) után egyszer lefuttatja
-  a `DAILYRPT`-t; 5 percenként ellenőriz. Leállítás: a stop-fájl létrehozása vagy `STOP $NAPI`.
+- **`DAILYLOOP`** – háttérben fut:
+  - 5 percenként megméri a figyelt portok (`napi^ports`, pl. `4275:ATM 7000:HSM`) forgalmát a CLIM-ek
+    összes névterében (portonként egy sor a napi `TCyymmdd` naplóba, a `TCPRATE L` üzemmódjával);
+  - minden nap a beállított időpont (alap 06:00) után egyszer lefuttatja a `DAILYRPT`-t, amely a tegnapi
+    naplóból órás TCP-riportot is készít (`TCPRATE D`, `$S.#B24NAPI.TCP`): üzenetek be/ki óránként,
+    a legforgalmasabb 5 perc, figyelmeztetések, hiányzó mérések.
+  Leállítás: a stop-fájl létrehozása vagy `STOP $NAPI`.
 
 A fájlneveket a `napi^cfg` szekcióban kell beállítani.
 

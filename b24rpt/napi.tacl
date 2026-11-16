@@ -6,9 +6,12 @@
 ==   - POS riport:  PTLFRPT a POyymmdd fajlra   -> $S.#B24NAPI.POS
 ==   - ATM riport:  TLFRPT  a TLyymmdd fajlra   -> $S.#B24NAPI.ATM
 ==   - EMS hibak:   EMSERR (EMSDIST + EMSSCAN)  -> $S.#EMSERR
+==   - TCP forgalom orankent (TCyymmdd naplo)   -> $S.#B24NAPI.TCP
 ==
-== DAILYLOOP               hattérben fut, es minden nap a beallitott
-==                          idopont utan egyszer lefuttatja a DAILYRPT-t
+== DAILYLOOP               hatterben fut:
+==   - 5 percenkent megmeri a figyelt portok (napi^ports) forgalmat a
+==     CLIM-eken, es a napi TCyymmdd naplofajlba irja
+==   - minden nap a beallitott idopont utan egyszer lefuttatja a DAILYRPT-t
 ==   Leallitas: hozd letre a stop-fajlt (FUP CREATE <stopf>), vagy STOP $NAPI
 ==
 == Inditas hatterben (egyszer kell, pl. rendszerinditas utan):
@@ -32,6 +35,10 @@
 #SET napi^emslib $DATA.EMSRPT.EMSERR        == EMSERR makro konyvtar
 #SET napi^ora    0600                       == DAILYLOOP: futas ideje (hhmm)
 #SET napi^stopf  $DATA.EMSRPT.STOPNAPI      == DAILYLOOP: stop-fajl
+== 5 percenkenti TCP meres (ures napi^ports = nincs meres)
+#SET napi^ports  4275:ATM 7000:HSM          == figyelt portok  port:nev
+#SET napi^clims  nclim000 nclim001          == CLIM-ek
+#SET napi^tclog  $DATA.EMSRPT               == TCyymmdd naplofajlok helye
 
 ?SECTION napi^tegnap MACRO
 == tegnapi datum beallitasa: napi^nap = yyyy-mm-dd, napi^ymd = yymmdd
@@ -48,9 +55,82 @@ SINK [#SETMANY jd yy mo dd , [dt]]
 #SET napi^ymd [y2][mo][dd]
 #POP ts dt jd yy mo dd y2
 
+?SECTION napi^nevterek MACRO
+== a CLIM-ek halozati nevterei -> napi^pairs ("clim nevter" soronkent)
+#PUSH rest cl nl ln nsn i
+#SET napi^pairs
+#SET rest [napi^clims]
+[#LOOP |WHILE| NOT [#EMPTYV rest] |DO|
+  #SET rest [#SETMANY cl , [rest]]
+  #SET nl
+  climcmd /OUTV nl/ [cl] ip netns list
+  #SET i 1
+  [#LOOP |WHILE| i <= [#LINECOUNT nl] |DO|
+    #SET ln [#LINEGET nl i]
+    #SET nsn
+    SINK [#SETMANY nsn , [ln]]
+    [#IF NOT [#EMPTYV nsn] AND [#CHARFIND ln 1 Termination] = 0 |THEN|
+      #APPEND napi^pairs [cl] [nsn]
+    ]
+    #SET i [#COMPUTE i + 1]
+  ]
+]
+#POP rest cl nl ln nsn i
+
+?SECTION napi^tcpmeres MACRO
+== egy pillanatkep a figyelt portokrol; az elozohoz kepest a
+== kulonbseget a TCPRATE program irja a mai TCyymmdd naplofajlba
+#PUSH cur all out junk rest pe pn pos pflt cl nsn k yy mo dd y2 logf
+SINK [#SETMANY yy mo dd , [#CONTIME [#TIMESTAMP]]]
+[#IF mo < 10 |THEN| #SET mo 0[mo]]
+[#IF dd < 10 |THEN| #SET dd 0[dd]]
+#SET y2 [#COMPUTE yy - 2000]
+[#IF y2 < 10 |THEN| #SET y2 0[y2]]
+#SET logf [napi^tclog].TC[y2][mo][dd]
+[#IF NOT [#FILEINFO /EXISTENCE/ [logf]] |THEN|
+  FUP CREATE [logf], TYPE E, REC 200, EXT (20,20)
+]
+
+== ss szuro az osszes figyelt portra: dport = :P or sport = :P or ...
+#SET pflt
+#SET rest [napi^ports]
+[#LOOP |WHILE| NOT [#EMPTYV rest] |DO|
+  #SET rest [#SETMANY pe , [rest]]
+  #SET pos [#CHARFIND pe 1 :]
+  [#IF pos > 1 |THEN| #SET pn [#CHARGET pe 1 TO [#COMPUTE pos - 1]] |ELSE| #SET pn [pe]]
+  [#IF [#EMPTYV pflt] |THEN|
+    #SET pflt dport = :[pn] or sport = :[pn]
+  |ELSE|
+    #SET pflt [pflt] or dport = :[pn] or sport = :[pn]
+  ]
+]
+
+#APPEND cur @@T 1 [#JULIANTIMESTAMP]
+#APPEND cur @@D 1 [#CONTIME [#TIMESTAMP]]
+#SET k 1
+[#LOOP |WHILE| k <= [#LINECOUNT napi^pairs] |DO|
+  SINK [#SETMANY cl nsn , [#LINEGET napi^pairs k]]
+  #SET out
+  climcmd /OUTV out/ [cl] ip netns exec [nsn] ss -tin [pflt]
+  #APPEND cur @@S 1 [cl] [nsn]
+  #APPENDV cur out
+  #SET k [#COMPUTE k + 1]
+]
+
+[#IF NOT [#EMPTYV napi^prev] |THEN|
+  #SET all
+  #APPENDV all napi^prev
+  #APPENDV all cur
+  RUN [napi^prog].TCPRATE /INV all, OUTV junk/ L [logf] [napi^ports]
+]
+#SET napi^prev
+#APPENDV napi^prev cur
+#POP cur all out junk rest pe pn pos pflt cl nsn k yy mo dd y2 logf
+
 ?SECTION dailyrpt MACRO
 #FRAME
 #PUSH napi^ptlf napi^tlf napi^prog napi^emslib napi^ora napi^stopf
+#PUSH napi^ports napi^clims napi^tclog
 #PUSH napi^nap napi^ymd pf tf y2 mo dd
 napi^cfg
 
@@ -90,25 +170,45 @@ napi^cfg
 LOAD /KEEP 1/ [napi^emslib]
 EMSERR [napi^nap]
 
+== 4. TCP forgalom orankent (a DAILYLOOP 5 percenkenti meresei)
+#SET tf [napi^tclog].TC[napi^ymd]
+[#IF [#FILEINFO /EXISTENCE/ [tf]] |THEN|
+  RUN [napi^prog].TCPRATE /OUT $S.#B24NAPI.TCP/ D [tf]
+  #OUTPUT DAILYRPT: TCP riport kesz ([tf])
+|ELSE|
+  #OUTPUT DAILYRPT: nincs TCP naplo: [tf]
+]
+
 #OUTPUT DAILYRPT: [napi^nap] - vege: [#CONTIME [#TIMESTAMP]]
 #UNFRAME
 
 ?SECTION dailyloop MACRO
 #FRAME
 #PUSH napi^ptlf napi^tlf napi^prog napi^emslib napi^ora napi^stopf
+#PUSH napi^ports napi^clims napi^tclog napi^pairs napi^prev
 #PUSH most hh mi kesz ma yy mo dd
 napi^cfg
 #SET kesz 0
-#OUTPUT DAILYLOOP: indul, futas minden nap [napi^ora] utan, stop: [napi^stopf]
+#OUTPUT DAILYLOOP: indul, riport minden nap [napi^ora] utan, stop: [napi^stopf]
+[#IF NOT [#EMPTYV napi^ports] |THEN|
+  napi^nevterek
+  #OUTPUT DAILYLOOP: TCP meres 5 percenkent: [napi^ports] &
+([#LINECOUNT napi^pairs] CLIM/nevter)
+]
 
 [#LOOP |WHILE| NOT [#FILEINFO /EXISTENCE/ [napi^stopf]] |DO|
-  == helyi ido: "yyyy mm dd hh mm ss cc"
+  == 5 percenkenti TCP meres
+  [#IF NOT [#EMPTYV napi^ports] |THEN| napi^tcpmeres]
+
+  == napi riport: a beallitott idopont utan naponta egyszer
   SINK [#SETMANY yy mo dd hh mi , [#CONTIME [#TIMESTAMP]]]
   #SET ma [#COMPUTE yy * 10000 + mo * 100 + dd]
   #SET most [#COMPUTE hh * 100 + mi]
   [#IF most >= napi^ora AND ma <> kesz |THEN|
     DAILYRPT
     #SET kesz [ma]
+    == nevterek frissitese naponta (pl. CLIM ujrainditas utan)
+    [#IF NOT [#EMPTYV napi^ports] |THEN| napi^nevterek]
   ]
   #DELAY 30000                       == 5 perc (szazadmasodpercben)
 ]
