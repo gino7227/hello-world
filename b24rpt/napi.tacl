@@ -69,6 +69,15 @@ climcmd /OUT [climv^tmp]/ %2 TO *%
   FUP /OUTV %1%/ COPY [climv^tmp]
 ]
 
+?SECTION climf MACRO
+== CLIMF fajl clim parancs...
+== A climcmd kimenete fajlba; ezt a TCPRATE program maga olvassa be (@@F),
+== mert a FUP COPY a hosszu rekordok veget levagna.
+[#IF [#FILEINFO /EXISTENCE/ %1%] |THEN|
+  FUP /OUTV climv^junk/ PURGE %1%!
+]
+climcmd /OUT %1%/ %2 TO *%
+
 ?SECTION napi^nevterek MACRO
 == a CLIM-ek halozati nevterei -> napi^pairs ("clim nevter" soronkent)
 #PUSH rest cl nl ln nsn i
@@ -93,7 +102,7 @@ climcmd /OUT [climv^tmp]/ %2 TO *%
 ?SECTION napi^tcpmeres MACRO
 == egy pillanatkep a figyelt portokrol; az elozohoz kepest a
 == kulonbseget a TCPRATE program irja a mai TCyymmdd naplofajlba
-#PUSH cur all out junk rest pe pn pos pflt cl nsn k yy mo dd y2 logf
+#PUSH cur all out junk rest pe pn pos pflt cl nsn k yy mo dd y2 logf kk ctf
 SINK [#SETMANY yy mo dd , [#CONTIME [#TIMESTAMP]]]
 [#IF mo < 10 |THEN| #SET mo 0[mo]]
 [#IF dd < 10 |THEN| #SET dd 0[dd]]
@@ -123,9 +132,14 @@ SINK [#SETMANY yy mo dd , [#CONTIME [#TIMESTAMP]]]
 #SET k 1
 [#LOOP |WHILE| k <= [#LINECOUNT napi^pairs] |DO|
   SINK [#SETMANY cl nsn , [#LINEGET napi^pairs k]]
-  CLIMV out [cl] ip netns exec [nsn] ss -tin [pflt]
+  #SET kk [k]
+  [#IF k < 10 |THEN| #SET kk 0[k]]
+  == ket fajlkeszlet (CTAkk / CTBkk) valtakozik, hogy az elozo meres
+  == fajljai a kovetkezo meresig megmaradjanak
+  #SET ctf [napi^tclog].CT[napi^set][kk]
+  CLIMF [ctf] [cl] ip netns exec [nsn] ss -tin [pflt]
   #APPEND cur @@S 1 [cl] [nsn]
-  #APPENDV cur out
+  #APPEND cur @@F [ctf]
   #SET k [#COMPUTE k + 1]
 ]
 
@@ -137,7 +151,8 @@ SINK [#SETMANY yy mo dd , [#CONTIME [#TIMESTAMP]]]
 ]
 #SET napi^prev
 #APPENDV napi^prev cur
-#POP cur all out junk rest pe pn pos pflt cl nsn k yy mo dd y2 logf
+[#IF napi^set '=' "A" |THEN| #SET napi^set B |ELSE| #SET napi^set A]
+#POP cur all out junk rest pe pn pos pflt cl nsn k yy mo dd y2 logf kk ctf
 
 ?SECTION dailyrpt MACRO
 #FRAME
@@ -197,10 +212,11 @@ EMSERR [napi^nap]
 ?SECTION dailyloop MACRO
 #FRAME
 #PUSH napi^ptlf napi^tlf napi^prog napi^emslib napi^ora napi^stopf
-#PUSH napi^ports napi^clims napi^tclog napi^pairs napi^prev climv^tmp climv^junk
+#PUSH napi^ports napi^clims napi^tclog napi^pairs napi^prev climv^tmp climv^junk napi^set
 #PUSH most hh mi kesz ma yy mo dd
 napi^cfg
 #SET kesz 0
+#SET napi^set A
 #OUTPUT DAILYLOOP: indul, riport minden nap [napi^ora] utan, stop: [napi^stopf]
 [#IF NOT [#EMPTYV napi^ports] |THEN|
   napi^nevterek
