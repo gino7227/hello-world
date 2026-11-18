@@ -17,6 +17,9 @@
  *   -c            CSV kimenet (pontosvesszovel elvalasztva, Excelhez)
  *   -n db         legfeljebb ennyi talalat fajlonkent (alap 500, 0 = mind; CSV: mind)
  *   -t P|T        fajltipus (P = PTLF, T = TLF), ha a nevbol nem derul ki
+ *   -s            teljes osszesites: a fajlt vegigolvassa (lassabb), alapbol a
+ *                 program leall, ha a talalatok elerik a -n szamot, vagy az
+ *                 idoablak lezarult
  *
  * A fajltipus a nev utolso reszebol derul ki: PO... = PTLF, TL... = TLF.
  * Ket fajl eseten mindkettot listazza, egymas utan.
@@ -245,6 +248,8 @@ static long parse_hms(const char *s)
 }
 
 /* ---------- fajl olvasas ---------- */
+static int sbb_on = 0;          /* 1 = blokkos olvasas (SBB) aktiv */
+static int o_full = 0;          /* -s: teljes osszesites (vegigolvas) */
 #ifdef __TANDEM
 static short fnum = -1;
 static int rd_open(const char *name)
@@ -252,6 +257,7 @@ static int rd_open(const char *name)
   /* sequential block buffering: egy fizikai olvasas sok rekordot hoz be
      (28 KB puffer); ha nem engedelyezett, sima megnyitas */
   short err = FILE_OPEN_(name, (short)strlen(name), &fnum, 1, 0, 0, 0, 0, 0, 28672);
+  sbb_on = (err == 0);
   if (err) err = FILE_OPEN_(name, (short)strlen(name), &fnum, 1, 0);
   if (err) { fprintf(stderr, "FILE_OPEN_ hiba %d: %s\n", err, name); return -1; }
   return 0;
@@ -325,7 +331,7 @@ static void list_file(const char *fn, char kind)
   const Layout *L = kind == 'P' ? &L_PTLF : &L_TLF;
   long n_tran = 0, n_hit = 0, n_hit_decl = 0, n_shown = 0;
   int len, lastday = -1, was_in = 0, stop_time = 0, stop_limit = 0;
-  long long last_in = 0, first_ts = 0;
+  long long last_in = 0, first_ts = 0, last_ts = 0;
   char a[48], b[48];
 
   endian_known = 0; big_endian = 1;
@@ -369,6 +375,7 @@ static void list_file(const char *fn, char kind)
 
     /* --- szurok --- */
     if (!first_ts) first_ts = ts;
+    last_ts = ts;
     if (f_from >= 0) {
       long sod = sec_of_day(ts);
       if (in_window(sod)) { was_in = 1; last_in = ts; }
@@ -381,7 +388,7 @@ static void list_file(const char *fn, char kind)
         if (was_in && ts - last_in > 600000000LL) {
           long wait = (f_from - sod + 86400L) % 86400L;
           long long next_start = ts + (long long)wait * 1000000LL;
-          if (next_start - first_ts > 25LL * 3600LL * 1000000LL) { stop_time = 1; break; }
+          if (!o_full && next_start - first_ts > 25LL * 3600LL * 1000000LL) { stop_time = 1; break; }
         }
         continue;
       }
@@ -409,7 +416,13 @@ static void list_file(const char *fn, char kind)
       if (sl && (n < sl || strcmp(pan + n - sl, f_card_suf) != 0)) continue;
     }
 
-    if (o_max > 0 && n_shown >= o_max) { stop_limit = 1; break; }   /* van meg talalat */
+    if (o_max > 0 && n_shown >= o_max) {           /* van meg talalat */
+      stop_limit = 1;
+      if (!o_full) break;
+      n_hit++;                                     /* -s: szamol, de nem ir */
+      if (!appr) n_hit_decl++;
+      continue;
+    }
     n_hit++;
     if (!appr) n_hit_decl++;
     n_shown++;
@@ -459,15 +472,29 @@ static void list_file(const char *fn, char kind)
 
   if (!o_csv) {
     line(RPT_W, '-');
-    if (stop_limit) {
-      printf("Megjelenitve az elso %s talalat, de tobb is van.\n", fmt_n(n_shown, a));
-      printf("Mindet: -n 0 (spoolerbe / CSV-be), vagy szukitsd a szurest.\n");
-    } else if (stop_time) {
-      printf("Talalat: %s tranzakcio (ebbol elutasitott %s)\n", fmt_n(n_hit, a), fmt_n(n_hit_decl, b));
-      printf("Az idoablak vege utan a fajl tovabbi reszet nem olvastam.\n");
-    } else
-      printf("Talalat: %s tranzakcio (ebbol elutasitott %s), a fajlban %s\n",
-             fmt_n(n_hit, a), fmt_n(n_hit_decl, b), fmt_n(n_tran, a + 24));
+    {
+      TmX t1, t2; char h1[16] = "-", h2[16] = "-";
+      if (first_ts && !ts_local(first_ts, &t1)) sprintf(h1, "%02d:%02d:%02d", t1.h, t1.mi, t1.s);
+      if (last_ts && !ts_local(last_ts, &t2)) sprintf(h2, "%02d:%02d:%02d", t2.h, t2.mi, t2.s);
+      if (stop_limit && !o_full)
+        printf("Talalat: %s+ tranzakcio (az elso %s; ebbol elutasitott %s)\n",
+               fmt_n(n_hit, a), fmt_n(n_shown, b), fmt_n(n_hit_decl, a + 24));
+      else if (stop_limit)
+        printf("Talalat: %s tranzakcio (ebbol elutasitott %s), megjelenitve az elso %s\n",
+               fmt_n(n_hit, a), fmt_n(n_hit_decl, b), fmt_n(n_shown, a + 24));
+      else
+        printf("Talalat: %s tranzakcio (ebbol elutasitott %s)\n", fmt_n(n_hit, a), fmt_n(n_hit_decl, b));
+      printf("Atvizsgalva: %s rekord, %s - %s%s%s\n", fmt_n(n_tran, a), h1, h2,
+             (stop_limit && !o_full) || stop_time ? " (a fajl tovabbi reszet nem olvastam)"
+                                                  : " (a teljes fajl)", "");
+      if (stop_limit && !o_full)
+        printf("Mindet listazni: -n 0 (spoolerbe / CSV-be); teljes osszesites: -s\n");
+      else if (stop_limit)
+        printf("Mindet listazni: -n 0 (spoolerbe / CSV-be)\n");
+#ifdef __TANDEM
+      printf("Olvasas: %s\n", sbb_on ? "blokkos (SBB)" : "rekordonkent (SBB nem engedelyezett)");
+#endif
+    }
     printf("* = elutasitott valaszkod. Dontes: Host / B24 / STIP / HostIF / ICHG\n");
   }
 }
@@ -480,7 +507,8 @@ static void usage(void)
     "  -m ATM0001      terminal eleje    -r 051,055   valaszkod(ok)\n"
     "  -e              csak elutasitott  -x 10        tranzakciokod\n"
     "  -l              hosszu lista      -c           CSV kimenet\n"
-    "  -n 500          max. talalat (0 = mind)   -t P|T  fajltipus (PTLF/TLF)\n");
+    "  -n 500          max. talalat (0 = mind)   -t P|T  fajltipus (PTLF/TLF)\n"
+    "  -s              teljes osszesites (vegigolvassa a fajlt)\n");
   exit(2);
 }
 
@@ -494,6 +522,7 @@ int main(int argc, char *argv[])
       if (o == 'e') { f_decl = 1; continue; }
       if (o == 'l') { o_long = 1; continue; }
       if (o == 'c') { o_csv = 1; continue; }
+      if (o == 's') { o_full = 1; continue; }
       if (i + 1 >= argc) usage();
       a = argv[++i];
       switch (o) {
