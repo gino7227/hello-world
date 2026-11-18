@@ -248,9 +248,9 @@ static long parse_hms(const char *s)
 }
 
 /* ---------- fajl olvasas ---------- */
-static int sbb_on = 0;          /* 1 = blokkos olvasas (SBB) aktiv */
 static int o_full = 0;          /* -s: teljes osszesites (vegigolvas) */
 #ifdef __TANDEM
+static int sbb_on = 0;          /* 1 = blokkos olvasas (SBB) aktiv */
 static short fnum = -1;
 static int rd_open(const char *name)
 {
@@ -485,7 +485,7 @@ static void list_file(const char *fn, char kind)
       else
         printf("Talalat: %s tranzakcio (ebbol elutasitott %s)\n", fmt_n(n_hit, a), fmt_n(n_hit_decl, b));
       printf("Atvizsgalva: %s rekord, %s - %s%s%s\n", fmt_n(n_tran, a), h1, h2,
-             (stop_limit && !o_full) || stop_time ? " (a fajl tovabbi reszet nem olvastam)"
+             (stop_limit && !o_full) || stop_time ? " (tovabb nem olvastam)"
                                                   : " (a teljes fajl)", "");
       if (stop_limit && !o_full)
         printf("Mindet listazni: -n 0 (spoolerbe / CSV-be); teljes osszesites: -s\n");
