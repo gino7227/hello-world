@@ -312,6 +312,9 @@ static long long file_t0 = 0;         /* a fajl elso rekordjanak ideje */
 static int  blk_probes = 0;           /* felezeses olvasasok szama */
 static unsigned char chunk[CHUNK_BLKS * 8192];   /* blokkmeret max. 8192 */
 static long chunk_n = 0, chunk_pos = 0;
+static long next_blk = 0;            /* a kovetkezo beolvasando blokk */
+static int  chunk_blks = CHUNK_BLKS; /* egyszerre olvasott blokkok (hiba: 1) */
+static long blk_recs = 0;            /* blokkokbol kiadott rekordok */
 
 #ifdef __TANDEM
 static short bfnum = -1;
@@ -348,6 +351,8 @@ static long blk_read(long long pos, unsigned char *buf, long n)
 {
   if (pos >= 0 && fseek(bf, (long)pos, SEEK_SET) != 0) return -1;
   if (n <= 0) return 0;
+  /* teszt: a TRN_MAXREAD kornyezeti valtozo a NonStop olvasasi korlatjat utanozza */
+  if (getenv("TRN_MAXREAD") && n > atol(getenv("TRN_MAXREAD"))) return -1;
   return (long)fread(buf, 1, (size_t)n, bf);
 }
 static void blk_close(void) { if (bf) fclose(bf); bf = NULL; }
@@ -368,14 +373,16 @@ static int is_rec_start(const unsigned char *p, long avail)
   return rt == 0 || rt == 4 || (rt >= 20 && rt <= 23);
 }
 
-/* a blokk elso rekordjanak ideje (0: nincs benne felismerheto rekord) */
+/* a blokk elso TRANZAKCIOS rekordjanak (REC-TYP 01) ideje; 0: nincs ilyen.
+   A fajl elejen allo "Initial record" (REC-TYP 00) a fajl letrehozasakor
+   keszult (akar napokkal korabban), ezert az idohoz nem hasznalhato. */
 static long long blk_first_ts(long blk)
 {
   static unsigned char b[65536];
   long n = blk_read((long long)blk * blk_sz, b, blk_sz), i;
   blk_probes++;
   for (i = 0; i + 10 <= n; i++)
-    if (is_rec_start(b + i, n - i)) return get64(b + i);
+    if (is_rec_start(b + i, n - i) && num(b + i + 8, 2) == 1) return get64(b + i);
   return 0;
 }
 
@@ -383,7 +390,7 @@ static long long blk_first_ts(long blk)
 static long long ts_near(long blk, long last)
 {
   long k;
-  for (k = 0; k < 16 && blk + k <= last; k++) {
+  for (k = 0; k < 64 && blk + k <= last; k++) {
     long long t = blk_first_ts(blk + k);
     if (t) return t;
   }
@@ -399,8 +406,8 @@ static int blk_seek_time(const char *fn)
   blk_probes = 0;
   /* bajtsorrend az elso blokkbol */
   big_endian = 1;
-  t0 = blk_first_ts(0);
-  if (!t0) { big_endian = 0; t0 = blk_first_ts(0); }
+  t0 = ts_near(0, 63);
+  if (!t0) { big_endian = 0; t0 = ts_near(0, 63); }
   if (!t0) { blk_close(); big_endian = 1; return 0; }
   endian_known = 1;
   file_t0 = t0;
@@ -437,8 +444,8 @@ static int blk_seek_time(const char *fn)
     }
   }
   blk_start = lo > 0 ? lo - 1 : 0;                /* egy blokkal korabban kezdunk */
-  if (blk_read((long long)blk_start * blk_sz, chunk, 0) < 0) { blk_close(); return 0; }
-  chunk_n = chunk_pos = 0;
+  next_blk = blk_start;
+  chunk_n = chunk_pos = 0; chunk_blks = CHUNK_BLKS; blk_recs = 0;
   blk_mode = 1;
   return 1;
 }
@@ -449,9 +456,14 @@ static int blk_next(unsigned char *buf, int max)
   for (;;) {
     long i, j, len;
     if (chunk_pos >= chunk_n) {
-      chunk_n = blk_read(-1, chunk, (long)CHUNK_BLKS * blk_sz);
+      chunk_n = blk_read((long long)next_blk * blk_sz, chunk, (long)chunk_blks * blk_sz);
+      if (chunk_n < 0 && chunk_blks > 1) {          /* nagy olvasas nem engedett */
+        chunk_blks = 1;
+        chunk_n = blk_read((long long)next_blk * blk_sz, chunk, (long)blk_sz);
+      }
       chunk_pos = 0;
       if (chunk_n <= 0) return chunk_n < 0 ? -1 : 0;
+      next_blk += (chunk_n + blk_sz - 1) / blk_sz;
     }
     /* rekord keresese a blokkhatarig */
     {
@@ -468,18 +480,23 @@ static int blk_next(unsigned char *buf, int max)
       if (len > max) len = max;
       memcpy(buf, chunk + i, (size_t)len);
       chunk_pos = j;
+      blk_recs++;
       return (int)len;
     }
   }
 }
 
 /* ---------- olvasas: blokkos ugras vagy sima sorrendi ---------- */
+static const char *rd_name;
+static int blk_fallback = 0;         /* 1 = ugras utan vegigolvasasra valtottunk */
 static int rd_open(const char *name)
 {
+  rd_name = name;
+  blk_fallback = 0;
   blk_mode = 0; blk_start = -1; file_t0 = 0;
   if (o_rawtest) {                       /* teszt: nyers blokkfajl elejetol */
     if (blk_open(name)) { perror(name); return -1; }
-    blk_read(0, chunk, 0); chunk_n = chunk_pos = 0; blk_mode = 1;
+    next_blk = 0; chunk_n = chunk_pos = 0; chunk_blks = CHUNK_BLKS; blk_recs = 0; blk_mode = 1;
     if (f_from >= 0 && !o_full) { blk_close(); blk_mode = 0; if (blk_seek_time(name)) return 0; return -1; }
     return 0;
   }
@@ -491,7 +508,15 @@ static int rd_open(const char *name)
 }
 static int rd_next(unsigned char *buf, int max)
 {
-  return blk_mode ? blk_next(buf, max) : seq_next(buf, max);
+  if (blk_mode) {
+    int r = blk_next(buf, max);
+    if (r > 0 || blk_recs > 0 || o_rawtest) return r;
+    /* az ugras utan egy rekord sem jott: sima vegigolvasas */
+    blk_close(); blk_mode = 0; blk_start = -1; blk_fallback = 1;
+    big_endian = 1; endian_known = 0;
+    if (seq_open(rd_name)) return -1;
+  }
+  return seq_next(buf, max);
 }
 static void rd_close(void)
 {
@@ -703,6 +728,8 @@ static void list_file(const char *fn, char kind)
         printf("Mindet listazni: -n 0 (spoolerbe / CSV-be)\n");
       if (blk_start >= 0)
         printf("Olvasas: ugras a %ld. blokkra (%d probaolvasas)\n", blk_start, blk_probes);
+      else if (blk_fallback)
+        printf("Olvasas: az ugras nem sikerult, vegigolvasas\n");
 #ifdef __TANDEM
       else
         printf("Olvasas: %s\n", sbb_on ? "blokkos (SBB)" : "rekordonkent");

@@ -10,6 +10,11 @@ d = open(src, 'rb').read(); i = 0; recs = []
 while i < len(d):
     n = struct.unpack('>H', d[i:i+2])[0]; recs.append(d[i+2:i+2+n]); i += 2 + n
 rnd = random.Random(7); out = bytearray(); blk = bytearray(rnd.randbytes(40)); k = 0
+# a fajl elejen "Initial record" (REC-TYP 00) a letrehozas idejevel (2 nappal korabban)
+if len(sys.argv) > 5 and sys.argv[5] == 'init':
+    t0 = struct.unpack('>q', recs[0][:8])[0] - 2 * 86400 * 10**6
+    init = bytearray(recs[0][:200]); init[0:8] = struct.pack('>q', t0); init[8:10] = b'00'
+    out += bytes(init) + bytes(bs - len(init))
 for r in recs:
     if len(blk) + len(r) + 64 > bs or k >= per:
         out += blk + bytes(bs - len(blk)); blk = bytearray(rnd.randbytes(40)); k = 0
