@@ -7,7 +7,7 @@
  *   RUN TRNLIST /OUT $DATA.LISTA.CSV1/ -c -k 1234 $DATA.PTLF.PO261114 $DATA.TLF.TL261114
  *
  * Opciok (mind elhagyhato, egyutt ES kapcsolatban):
- *   -i hh:mm[:ss]-hh:mm[:ss]  idotartomany (helyi ido)
+ *   -i hh:mm[:ss]-hh:mm[:ss]  idotartomany (helyi ido); 23:00-01:00 = ejfelen at
  *   -k kartya     utolso 4 jegy (1234), eleje (411111*), vagy mindketto (411111*1234)
  *   -m terminal   terminal azonosito eleje (pl. ATM0001)
  *   -r kodok      valaszkod(ok) vesszovel: 051,055
@@ -200,6 +200,42 @@ static int ts_local(long long jts, TmX *t)
 #endif
 }
 
+/* GMT -> helyi ido eltolas (mikroszekundum), oranként egyszer szamolva,
+   hogy ne kelljen minden rekordnal rendszerhivas */
+static long long off_us, off_from = 0, off_to = -1;
+static long long local_off(long long jts)
+{
+  if (jts < off_from || jts > off_to) {
+#ifdef __TANDEM
+    off_us = CONVERTTIMESTAMP(jts, 0) - jts;
+#else
+    time_t s = (time_t)((jts - JTS_UNIX_EPOCH) / 1000000LL);
+    struct tm lt = *localtime(&s), gt = *gmtime(&s);
+    long d = (lt.tm_yday - gt.tm_yday);
+    if (d > 1) d = -1; else if (d < -1) d = 1;          /* evvaltas */
+    off_us = ((d * 24L + lt.tm_hour - gt.tm_hour) * 3600L
+              + (lt.tm_min - gt.tm_min) * 60L) * 1000000LL;
+#endif
+    off_from = jts - jts % 3600000000LL;
+    off_to = off_from + 3600000000LL - 1;
+  }
+  return off_us;
+}
+
+/* mp a helyi ejfel ota */
+static long sec_of_day(long long jts)
+{
+  long long s = (jts - JTS_UNIX_EPOCH + local_off(jts)) / 1000000LL;
+  return (long)(s % 86400);
+}
+
+/* idoablak: ha a -ig korabbi, mint a -tol, ejfelen atnyulo szakasz */
+static int in_window(long sod)
+{
+  if (f_from <= f_to) return sod >= f_from && sod <= f_to;
+  return sod >= f_from || sod <= f_to;
+}
+
 /* "hh:mm[:ss]" -> mp az ejfel ota, -1 ha hibas */
 static long parse_hms(const char *s)
 {
@@ -213,7 +249,10 @@ static long parse_hms(const char *s)
 static short fnum = -1;
 static int rd_open(const char *name)
 {
-  short err = FILE_OPEN_(name, (short)strlen(name), &fnum, 1, 0);
+  /* sequential block buffering: egy fizikai olvasas sok rekordot hoz be
+     (28 KB puffer); ha nem engedelyezett, sima megnyitas */
+  short err = FILE_OPEN_(name, (short)strlen(name), &fnum, 1, 0, 0, 0, 0, 0, 28672);
+  if (err) err = FILE_OPEN_(name, (short)strlen(name), &fnum, 1, 0);
   if (err) { fprintf(stderr, "FILE_OPEN_ hiba %d: %s\n", err, name); return -1; }
   return 0;
 }
@@ -285,7 +324,8 @@ static void list_file(const char *fn, char kind)
   static unsigned char r[MAXREC];
   const Layout *L = kind == 'P' ? &L_PTLF : &L_TLF;
   long n_tran = 0, n_hit = 0, n_hit_decl = 0, n_shown = 0;
-  int len, lastday = -1;
+  int len, lastday = -1, was_in = 0, stop_time = 0, stop_limit = 0;
+  long long last_in = 0, first_ts = 0;
   char a[48], b[48];
 
   endian_known = 0; big_endian = 1;
@@ -304,7 +344,7 @@ static void list_file(const char *fn, char kind)
 
   while ((len = rd_next(r, MAXREC)) > 0) {
     long long ts, et, rt;
-    long typ, tcde, resp, secs = -1;
+    long typ, tcde, resp;
     int crn, appr;
     TmX t;
     char pan[20], pm[20], term[17], cn[16], dt[48], tm[48];
@@ -328,9 +368,24 @@ static void list_file(const char *fn, char kind)
     n_tran++;
 
     /* --- szurok --- */
-    if (ts_local(ts, &t) == 0) secs = t.h * 3600L + t.mi * 60L + t.s;
-    else t.y = t.mo = t.d = t.h = t.mi = t.s = 0;
-    if (f_from >= 0 && (secs < f_from || secs > f_to)) continue;
+    if (!first_ts) first_ts = ts;
+    if (f_from >= 0) {
+      long sod = sec_of_day(ts);
+      if (in_window(sod)) { was_in = 1; last_in = ts; }
+      else {
+        /* A fajl idorendben van es kb. 24 orat fog at. Ha az idoablak lezarult
+           (10 perc turessel a kesve irt rekordok miatt), es a kovetkezo
+           elofordulasa mar a fajl kezdete utani 25 oran tul lenne, nem
+           olvasunk tovabb. (Az ablak a fajl elejen es vegen is lehet,
+           pl. 20:30-as napvaltasnal 20:00-21:00.) */
+        if (was_in && ts - last_in > 600000000LL) {
+          long wait = (f_from - sod + 86400L) % 86400L;
+          long long next_start = ts + (long long)wait * 1000000LL;
+          if (next_start - first_ts > 25LL * 3600LL * 1000000LL) { stop_time = 1; break; }
+        }
+        continue;
+      }
+    }
 
     tcde = num(r + L->tcde, 2);
     if (f_tcde >= 0 && tcde != f_tcde) continue;
@@ -354,10 +409,11 @@ static void list_file(const char *fn, char kind)
       if (sl && (n < sl || strcmp(pan + n - sl, f_card_suf) != 0)) continue;
     }
 
+    if (o_max > 0 && n_shown >= o_max) { stop_limit = 1; break; }   /* van meg talalat */
     n_hit++;
     if (!appr) n_hit_decl++;
-    if (o_max > 0 && n_shown >= o_max) continue;     /* tovabb szamol, de nem ir */
     n_shown++;
+    if (ts_local(ts, &t) != 0) t.y = t.mo = t.d = t.h = t.mi = t.s = 0;
 
     /* --- kiiras --- */
     mask_pan(pan, pm);
@@ -403,10 +459,15 @@ static void list_file(const char *fn, char kind)
 
   if (!o_csv) {
     line(RPT_W, '-');
-    printf("Talalat: %s tranzakcio (ebbol elutasitott %s), a fajlban %s\n",
-           fmt_n(n_hit, a), fmt_n(n_hit_decl, b), fmt_n(n_tran, a + 24));
-    if (n_hit > n_shown)
-      printf("Megjelenitve az elso %ld. Mindet: -n 0, vagy szukitsd a szurest.\n", n_shown);
+    if (stop_limit) {
+      printf("Megjelenitve az elso %s talalat, de tobb is van.\n", fmt_n(n_shown, a));
+      printf("Mindet: -n 0 (spoolerbe / CSV-be), vagy szukitsd a szurest.\n");
+    } else if (stop_time) {
+      printf("Talalat: %s tranzakcio (ebbol elutasitott %s)\n", fmt_n(n_hit, a), fmt_n(n_hit_decl, b));
+      printf("Az idoablak vege utan a fajl tovabbi reszet nem olvastam.\n");
+    } else
+      printf("Talalat: %s tranzakcio (ebbol elutasitott %s), a fajlban %s\n",
+             fmt_n(n_hit, a), fmt_n(n_hit_decl, b), fmt_n(n_tran, a + 24));
     printf("* = elutasitott valaszkod. Dontes: Host / B24 / STIP / HostIF / ICHG\n");
   }
 }
@@ -442,8 +503,9 @@ int main(int argc, char *argv[])
         *d = 0;
         f_from = parse_hms(a); f_to = parse_hms(d + 1);
         if (f_from < 0 || f_to < 0) usage();
-        if (f_to < f_from) { long x = f_from; f_from = f_to; f_to = x; }
         if (!strchr(d + 1 + 3, ':')) f_to += 59;   /* hh:mm -> a perc vegeig */
+        if (f_to >= 86400) f_to = 86399;
+        /* ha a -ig korabbi, mint a -tol: ejfelen atnyulo szakasz (pl. 23:00-01:00) */
         break;
       }
       case 'k': {
