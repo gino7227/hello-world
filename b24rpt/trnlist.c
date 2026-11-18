@@ -310,6 +310,8 @@ static int  blk_mode = 0;             /* 1 = blokkokbol olvasunk */
 static long blk_start = -1;           /* ide ugrottunk (blokk) */
 static long long file_t0 = 0;         /* a fajl elso rekordjanak ideje */
 static int  blk_probes = 0;           /* felezeses olvasasok szama */
+static char seek_fail[80] = "";       /* miert nem sikerult az ugras */
+static int  o_diag = 0;               /* -v: blokk-diagnosztika */
 static unsigned char chunk[CHUNK_BLKS * 8192];   /* blokkmeret max. 8192 */
 static long chunk_n = 0, chunk_pos = 0;
 static long next_blk = 0;            /* a kovetkezo beolvasando blokk */
@@ -321,7 +323,7 @@ static short bfnum = -1;
 static int blk_open(const char *name)
 {
   short err = FILE_OPEN_(name, (short)strlen(name), &bfnum, 1, 0, 0, 0, OPEN_UNSTRUCT);
-  if (err) { bfnum = -1; return -1; }
+  if (err) { bfnum = -1; sprintf(seek_fail, "blokkos megnyitas hiba %d", err); return -1; }
   return 0;
 }
 /* n bajt olvasasa a bajtpoziciotol (pos < 0: folytatas) */
@@ -397,6 +399,44 @@ static long long ts_near(long blk, long last)
   return 0;
 }
 
+/* -v: nehany blokkban kiirja az idobelyegnek latszo helyeket es a
+   szerkezeti mezoket (kartyaadat nelkul) */
+static void blk_diag(void)
+{
+  static unsigned char b[65536];
+  static const long probe[] = { 0, 1, 2, 3, 100, 1000, 10000, 100000, -1 };
+  int k, e;
+  for (k = 0; probe[k] >= 0; k++) {
+    long n = blk_read((long long)probe[k] * blk_sz, b, blk_sz), i, shown = 0;
+    printf("DIAG blokk %ld: %ld bajt\n", probe[k], n);
+    if (n <= 0) break;
+    for (e = 1; e >= 0; e--) {
+      int save = big_endian;
+      big_endian = e;
+      for (i = 0; i + 8 <= n && shown < 8; i++) {
+        long long t = get64(b + i);
+        if (plausible_ts(t)) {
+          TmX tm; char rt[3] = "  ", fr = ' ', ty[5] = "    ";
+          ts_local(t, &tm);
+          if (i + 10 <= n) { rt[0] = (char)b[i + 8]; rt[1] = (char)b[i + 9]; }
+          if (i + 146 <= n) fr = (char)b[i + 145];
+          if (i + 176 <= n) memcpy(ty, b + i + 172, 4);
+          {
+            int q;
+            for (q = 0; q < 2; q++) if (rt[q] < 32 || rt[q] > 126) rt[q] = '.';
+            if (fr < 32 || fr > 126) fr = '.';
+            for (q = 0; q < 4; q++) if (ty[q] < 32 || ty[q] > 126) ty[q] = '.';
+          }
+          printf("  off %5ld %s %04d.%02d.%02d %02d:%02d:%02d REC-TYP='%s' +145='%c' +172='%s'\n",
+                 i, e ? "BE" : "LE", tm.y, tm.mo, tm.d, tm.h, tm.mi, tm.s, rt, fr, ty);
+          shown++;
+        }
+      }
+      big_endian = save;
+    }
+  }
+}
+
 /* felezeses kereses: az idoablak elotti blokkra all. 1 = sikerult */
 static int blk_seek_time(const char *fn)
 {
@@ -404,11 +444,16 @@ static int blk_seek_time(const char *fn)
   long hi, lo, last, mid;
   if (blk_open(fn)) return 0;
   blk_probes = 0;
+  if (o_diag) blk_diag();
   /* bajtsorrend az elso blokkbol */
   big_endian = 1;
   t0 = ts_near(0, 63);
   if (!t0) { big_endian = 0; t0 = ts_near(0, 63); }
-  if (!t0) { blk_close(); big_endian = 1; return 0; }
+  if (!t0) {
+    blk_close(); big_endian = 1;
+    strcpy(seek_fail, "a fajl elejen nem ismert fel tranzakcios rekordot");
+    return 0;
+  }
   endian_known = 1;
   file_t0 = t0;
 
@@ -439,7 +484,11 @@ static int blk_seek_time(const char *fn)
       long long t;
       mid = lo + (hi - lo) / 2;
       t = ts_near(mid, last);
-      if (!t) { blk_close(); return 0; }          /* nem ismerheto fel: vegigolvasas */
+      if (!t) {                                    /* nem ismerheto fel: vegigolvasas */
+        blk_close();
+        sprintf(seek_fail, "a %ld. blokkban nem ismert fel rekordot", mid);
+        return 0;
+      }
       if (t < target) lo = mid + 1; else hi = mid;
     }
   }
@@ -493,6 +542,7 @@ static int rd_open(const char *name)
 {
   rd_name = name;
   blk_fallback = 0;
+  seek_fail[0] = 0;
   blk_mode = 0; blk_start = -1; file_t0 = 0;
   if (o_rawtest) {                       /* teszt: nyers blokkfajl elejetol */
     if (blk_open(name)) { perror(name); return -1; }
@@ -734,6 +784,8 @@ static void list_file(const char *fn, char kind)
       else
         printf("Olvasas: %s\n", sbb_on ? "blokkos (SBB)" : "rekordonkent");
 #endif
+      if (seek_fail[0] && f_from >= 0)
+        printf("Ugras nem sikerult: %.60s\n", seek_fail);
     }
     printf("* = elutasitott valaszkod. Dontes: Host / B24 / STIP / HostIF / ICHG\n");
   }
@@ -764,6 +816,7 @@ int main(int argc, char *argv[])
       if (o == 'c') { o_csv = 1; continue; }
       if (o == 's') { o_full = 1; continue; }
       if (a[1] == 'B') { o_rawtest = 1; continue; }     /* teszt: nyers blokkfajl */
+      if (o == 'v') { o_diag = 1; continue; }
       if (i + 1 >= argc) usage();
       a = argv[++i];
       switch (o) {
