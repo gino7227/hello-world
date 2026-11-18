@@ -418,8 +418,10 @@ static void list_file(const char *fn, char kind)
 
     if (o_max > 0 && n_shown >= o_max) {           /* van meg talalat */
       stop_limit = 1;
-      if (!o_full) break;
-      n_hit++;                                     /* -s: szamol, de nem ir */
+      /* idoszuresnel az idoablak vegeig tovabb szamol (pontos darabszam),
+         -s eseten a fajl vegeig; egyebkent itt megall */
+      if (!o_full && f_from < 0) break;
+      n_hit++;                                     /* szamol, de nem ir */
       if (!appr) n_hit_decl++;
       continue;
     }
@@ -476,7 +478,7 @@ static void list_file(const char *fn, char kind)
       TmX t1, t2; char h1[16] = "-", h2[16] = "-";
       if (first_ts && !ts_local(first_ts, &t1)) sprintf(h1, "%02d:%02d:%02d", t1.h, t1.mi, t1.s);
       if (last_ts && !ts_local(last_ts, &t2)) sprintf(h2, "%02d:%02d:%02d", t2.h, t2.mi, t2.s);
-      if (stop_limit && !o_full)
+      if (stop_limit && !o_full && f_from < 0)
         printf("Talalat: %s+ tranzakcio (az elso %s; ebbol elutasitott %s)\n",
                fmt_n(n_hit, a), fmt_n(n_shown, b), fmt_n(n_hit_decl, a + 24));
       else if (stop_limit)
@@ -485,9 +487,9 @@ static void list_file(const char *fn, char kind)
       else
         printf("Talalat: %s tranzakcio (ebbol elutasitott %s)\n", fmt_n(n_hit, a), fmt_n(n_hit_decl, b));
       printf("Atvizsgalva: %s rekord, %s - %s%s%s\n", fmt_n(n_tran, a), h1, h2,
-             (stop_limit && !o_full) || stop_time ? " (tovabb nem olvastam)"
+             (stop_limit && !o_full && f_from < 0) || stop_time ? " (tovabb nem olvastam)"
                                                   : " (a teljes fajl)", "");
-      if (stop_limit && !o_full)
+      if (stop_limit && !o_full && f_from < 0)
         printf("Mindet listazni: -n 0 (spoolerbe / CSV-be); teljes osszesites: -s\n");
       else if (stop_limit)
         printf("Mindet listazni: -n 0 (spoolerbe / CSV-be)\n");
