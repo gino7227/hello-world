@@ -120,3 +120,29 @@ van-e minden. Visszamenőleg nem lehet mérni, mert a CLIM csak összesített sz
 - `R`: kapcsolatonkénti részletek (rtt, Send-Q, utolsó fogadás, újraküldés) és túloldal szerinti bontás.
 
 A CLIM-ek nevét és a program helyét a makró BEÁLLÍTÁSOK részében kell megadni.
+
+---
+
+# TRNLIST – tranzakciók listázása (PTLF és/vagy TLF)
+
+```
+RUN TRNLIST [opciók] fájl [fájl2]
+RUN TRNLIST -i 10:00-10:15 -e $DATA.TLF.TL261114                 == képernyőre
+RUN TRNLIST /OUT $S.#TRNLIST/ -k 1234 $DATA.PTLF.PO261114 $DATA.TLF.TL261114
+RUN TRNLIST /OUT $DATA.LISTA.CSV1/ -c -r 051 $DATA.PTLF.PO261114  == CSV fájlba
+```
+
+| Opció | Szűrés / kimenet |
+|---|---|
+| `-i hh:mm[:ss]-hh:mm[:ss]` | időtartomány (helyi idő) |
+| `-k 1234` / `411111*` / `411111*1234` | kártya: utolsó 4 jegy, eleje, vagy mindkettő |
+| `-m ATM0001` | terminál azonosító eleje |
+| `-r 051,055` | válaszkód(ok) |
+| `-e` | csak elutasított |
+| `-x 10` | tranzakciókód (POS: TC, ATM: T-CDE) |
+| `-l` | hosszú lista (hely, ország, válaszidő, sztornó ok) |
+| `-c` | CSV (pontosvessző, Excelhez) |
+| `-n 500` | max. találat fájlonként (0 = mind; CSV-nél alapból mind) |
+| `-t P` / `-t T` | fájltípus, ha a névből (`PO…` / `TL…`) nem derül ki |
+
+A kártyaszám mindig maszkolva jelenik meg (első 6 + utolsó 4 jegy). A szűrők ÉS kapcsolatban vannak.
