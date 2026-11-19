@@ -1,16 +1,15 @@
 ?TACL MACRO
 == ==================================================================
-== GYAK - gyakorlo homokozo uj NonStop kollegaknak (\EH06, $HD1)
+== GYAK - gyakorlo homokozo uj NonStop kollegaknak (\EH06, $HD1.GYAK)
 ==
 == Betoltes:   LOAD /KEEP 1/ $HD1.OKTATAS.GYAK
 ==
-==   GYAKINIT AB    homokozo letrehozasa: $HD1.GYAKAB (AB = monogram,
-==                  legfeljebb 4 betu), benne mintafajlok:
-==                    MINTA  - szoveges (EDIT) fajl
-==                    ADAT   - entry-sequenced adatfajl
-==                    KULCS  - key-sequenced adatfajl
-==   GYAKCHK AB     a gyakorlo feladatok ellenorzese (OK / MEG NEM)
-==   GYAKTOROL AB   a homokozo torlese (csak $HD1.GYAK... alkotet!)
+==   GYAKINIT    a homokozo letrehozasa: $HD1.GYAK, benne mintafajlok:
+==                 MINTA  - szoveges (EDIT) fajl
+==                 ADAT   - entry-sequenced adatfajl
+==                 KULCS  - key-sequenced adatfajl
+==   GYAKCHK     a gyakorlo feladatok ellenorzese (OK / MEG NEM)
+==   GYAKTOROL   a homokozo torlese (csak a $HD1.GYAK alkotet!)
 ==
 == A feladatok leirasa: "NonStop alapok" cikk, 7. fejezet.
 == A BEALLITASOK reszben (gyak^cfg) add meg, hol van ez a konyvtar.
@@ -18,55 +17,36 @@
 
 ?SECTION gyak^cfg MACRO
 == ---------------------- BEALLITASOK ----------------------
-#SET gyak^vol $HD1                   == a homokozok kotete (\EH06)
+#SET gyak^sv  $HD1.GYAK              == a homokozo alkotet (\EH06)
 #SET gyak^lib $HD1.OKTATAS.GYAK      == ez a makrokonyvtar: a MINTA forrasa
-
-?SECTION gyak^sv MACRO
-== gyak^az (monogram) -> gyak^sv = $HD1.GYAKxx; gyak^ok = -1, ha rendben
-#SET gyak^ok 0
-[#IF [#EMPTYV gyak^az] |THEN|
-  #OUTPUT Add meg a monogramodat (legfeljebb 4 betu), pl.: GYAKINIT AB
-|ELSE|
-  #SET gyak^az [#SHIFTSTRING /UP/ [gyak^az]]
-  [#IF [#CHARCOUNT gyak^az] > 4 |THEN|
-    #OUTPUT A monogram legfeljebb 4 karakter lehet.
-  |ELSE|
-    #SET gyak^sv [gyak^vol].GYAK[gyak^az]
-    #SET gyak^ok -1
-  ]
-]
 
 ?SECTION gyakinit MACRO
 #FRAME
-#PUSH gyak^vol gyak^lib gyak^az gyak^sv gyak^ok junk
+#PUSH gyak^sv gyak^lib junk
 gyak^cfg
-#SET gyak^az %1%
-gyak^sv
-[#IF gyak^ok |THEN|
+[#IF [#FILEINFO /EXISTENCE/ [gyak^sv].MINTA] |THEN|
+  #OUTPUT A homokozo mar letezik: [gyak^sv]
+  #OUTPUT Ujrakezdes: GYAKTOROL, majd GYAKINIT
+|ELSE|
+  #OUTPUT Homokozo letrehozasa: [gyak^sv] ...
+  == MINTA: szoveges (EDIT, 101) fajl - ennek a makrokonyvtarnak a masolata
+  FUP /OUTV junk/ DUP [gyak^lib], [gyak^sv].MINTA
+  == ADAT: entry-sequenced, a MINTA soraival feltoltve
+  FUP /OUTV junk/ CREATE [gyak^sv].ADAT, TYPE E, REC 240
+  FUP /OUTV junk/ COPY [gyak^sv].MINTA, [gyak^sv].ADAT
+  == KULCS: ures key-sequenced fajl
+  FUP /OUTV junk/ CREATE [gyak^sv].KULCS, TYPE K, REC 80, KEYLEN 8
+  FUP /OUTV junk/ SECURE [gyak^sv].*, "NUNU"
   [#IF [#FILEINFO /EXISTENCE/ [gyak^sv].MINTA] |THEN|
-    #OUTPUT A homokozo mar letezik: [gyak^sv]
-    #OUTPUT Ujrakezdes: GYAKTOROL [gyak^az], majd GYAKINIT [gyak^az]
+    #OUTPUT Kesz. Fajlok: MINTA (szoveg), ADAT (entry-seq), KULCS (key-seq)
+    #OUTPUT
+    #OUTPUT Kezdes:     VOLUME [gyak^sv]
+    #OUTPUT Feladatok:  "NonStop alapok" cikk, 7. fejezet
+    #OUTPUT Ellenorzes: GYAKCHK
   |ELSE|
-    #OUTPUT Homokozo letrehozasa: [gyak^sv] ...
-    == MINTA: szoveges (EDIT, 101) fajl - ennek a makrokonyvtarnak a masolata
-    FUP /OUTV junk/ DUP [gyak^lib], [gyak^sv].MINTA
-    == ADAT: entry-sequenced, a MINTA soraival feltoltve
-    FUP /OUTV junk/ CREATE [gyak^sv].ADAT, TYPE E, REC 240
-    FUP /OUTV junk/ COPY [gyak^sv].MINTA, [gyak^sv].ADAT
-    == KULCS: ures key-sequenced fajl
-    FUP /OUTV junk/ CREATE [gyak^sv].KULCS, TYPE K, REC 80, KEYLEN 8
-    FUP /OUTV junk/ SECURE [gyak^sv].*, "NUNU"
-    [#IF [#FILEINFO /EXISTENCE/ [gyak^sv].MINTA] |THEN|
-      #OUTPUT Kesz. Fajlok: MINTA (szoveg), ADAT (entry-seq), KULCS (key-seq)
-      #OUTPUT
-      #OUTPUT Kezdes:     VOLUME [gyak^sv]
-      #OUTPUT Feladatok:  "NonStop alapok" cikk, 7. fejezet
-      #OUTPUT Ellenorzes: GYAKCHK [gyak^az]
-    |ELSE|
-      #OUTPUT HIBA: a homokozo nem jott letre. A FUP uzenete:
-      #OUTPUTV junk
-      #OUTPUT Ellenorizd a beallitast (gyak^lib) es a jogosultsagot.
-    ]
+    #OUTPUT HIBA: a homokozo nem jott letre. A FUP uzenete:
+    #OUTPUTV junk
+    #OUTPUT Ellenorizd a beallitast (gyak^lib) es a jogosultsagot.
   ]
 ]
 #UNFRAME
@@ -84,126 +64,113 @@ gyak^sv
 
 ?SECTION gyakchk MACRO
 #FRAME
-#PUSH gyak^vol gyak^lib gyak^az gyak^sv gyak^ok gyak^n gyak^k fi d f
+#PUSH gyak^sv gyak^lib gyak^n gyak^k fi d f
 gyak^cfg
-#SET gyak^az %1%
-gyak^sv
-[#IF gyak^ok |THEN|
-  #SET gyak^n 0
-  #SET gyak^k 0
-  #OUTPUT ================================================================
-  #OUTPUT GYAKCHK - gyakorlo feladatok ellenorzese: [gyak^sv]
-  #OUTPUT ================================================================
-  [#IF NOT [#FILEINFO /EXISTENCE/ [gyak^sv].MINTA] |THEN|
-    #OUTPUT Nincs ilyen homokozo. Letrehozas: GYAKINIT [gyak^az]
+#SET gyak^n 0
+#SET gyak^k 0
+#OUTPUT ================================================================
+#OUTPUT GYAKCHK - gyakorlo feladatok ellenorzese: [gyak^sv]
+#OUTPUT ================================================================
+[#IF NOT [#FILEINFO /EXISTENCE/ [gyak^sv].MINTA] |THEN|
+  #OUTPUT Nincs homokozo. Letrehozas: GYAKINIT
+|ELSE|
+
+  == 1. beallas a homokozoba (VOLUME)
+  #SET d [#DEFAULTS /CURRENT/]
+  [#IF [#CHARFIND d 1 [gyak^sv]] > 0 |THEN|
+    gyak^sor 1 OK Beallas a homokozoba
   |ELSE|
+    gyak^sor 1 MEG Beallas a homokozoba (most: [d])
+  ]
 
-    == 1. beallas a homokozoba (VOLUME)
-    #SET d [#DEFAULTS /CURRENT/]
-    [#IF [#CHARFIND d 1 GYAK[gyak^az]] > 0 |THEN|
-      gyak^sor 1 OK Beallas a homokozoba
+  == 2-3. listazas, reszletek: nem hagy nyomot
+  gyak^sor 2 ONE Listazas - a 101-es kodu (szoveges) fajl: MINTA
+  gyak^sor 3 ONE Reszletek - ADAT: entry-seq, REC 240; KULCS: key-seq
+
+  == 4. NAPLO: entry-sequenced, 200 bajtos rekord
+  #SET f [gyak^sv].NAPLO
+  [#IF NOT [#FILEINFO /EXISTENCE/ [f]] |THEN|
+    gyak^sor 4 MEG NAPLO letrehozasa (nincs NAPLO fajl)
+  |ELSE|
+    #SET fi
+    FUP /OUTV fi/ INFO [f], DETAIL
+    [#IF [#CHARFIND fi 1 TYPE E] > 0 AND [#CHARFIND fi 1 REC 200] > 0 |THEN|
+      gyak^sor 4 OK NAPLO letrehozasa (entry-seq, REC 200)
     |ELSE|
-      gyak^sor 1 MEG Beallas a homokozoba (most: [d])
+      gyak^sor 4 MEG NAPLO letrehozasa (nem entry-seq, vagy nem 200 a rekord)
     ]
+  ]
 
-    == 2-3. listazas, reszletek: nem hagy nyomot
-    gyak^sor 2 ONE Listazas - a 101-es kodu (szoveges) fajl: MINTA
-    gyak^sor 3 ONE Reszletek - ADAT: entry-seq, REC 240; KULCS: key-seq
-
-    == 4. NAPLO: entry-sequenced, 200 bajtos rekord
-    #SET f [gyak^sv].NAPLO
-    [#IF NOT [#FILEINFO /EXISTENCE/ [f]] |THEN|
-      gyak^sor 4 MEG NAPLO letrehozasa (nincs NAPLO fajl)
+  == 5. JEGYZET: szoveges fajl, nem ures
+  #SET f [gyak^sv].JEGYZET
+  [#IF NOT [#FILEINFO /EXISTENCE/ [f]] |THEN|
+    gyak^sor 5 MEG JEGYZET szovegfajl (nincs JEGYZET fajl)
+  |ELSE|
+    [#IF [#FILEINFO /CODE/ [f]] = 101 AND [#FILEINFO /EOF/ [f]] > 0 |THEN|
+      gyak^sor 5 OK JEGYZET szovegfajl
     |ELSE|
-      #SET fi
-      FUP /OUTV fi/ INFO [f], DETAIL
-      [#IF [#CHARFIND fi 1 TYPE E] > 0 AND [#CHARFIND fi 1 REC 200] > 0 |THEN|
-        gyak^sor 4 OK NAPLO letrehozasa (entry-seq, REC 200)
+      gyak^sor 5 MEG JEGYZET szovegfajl (nem 101-es kodu, vagy ures)
+    ]
+  ]
+
+  == 6. masolas (JEGYZET2), atnevezes (JEGYZ3), ADAT torlese
+  [#IF [#FILEINFO /EXISTENCE/ [gyak^sv].JEGYZ3] |THEN|
+    [#IF [#FILEINFO /EXISTENCE/ [gyak^sv].JEGYZET2] |THEN|
+      gyak^sor 6 MEG Masolas, atnevezes, torles (JEGYZET2 meg megvan)
+    |ELSE|
+      [#IF [#FILEINFO /EXISTENCE/ [gyak^sv].ADAT] |THEN|
+        gyak^sor 6 MEG Masolas, atnevezes, torles (az ADAT meg megvan)
       |ELSE|
-        gyak^sor 4 MEG NAPLO letrehozasa (nem entry-seq, vagy nem 200 a rekord)
+        gyak^sor 6 OK Masolas, atnevezes, torles
       ]
     ]
+  |ELSE|
+    gyak^sor 6 MEG Masolas, atnevezes, torles (nincs JEGYZ3 fajl)
+  ]
 
-    == 5. JEGYZET: szoveges fajl, nem ures
-    #SET f [gyak^sv].JEGYZET
-    [#IF NOT [#FILEINFO /EXISTENCE/ [f]] |THEN|
-      gyak^sor 5 MEG JEGYZET szovegfajl (nincs JEGYZET fajl)
+  == 7. NAPLO jogosultsaga: AOOO
+  #SET f [gyak^sv].NAPLO
+  [#IF NOT [#FILEINFO /EXISTENCE/ [f]] |THEN|
+    gyak^sor 7 MEG Jogosultsag AOOO (nincs NAPLO fajl)
+  |ELSE|
+    #SET fi
+    FUP /OUTV fi/ INFO [f], DETAIL
+    [#IF [#CHARFIND fi 1 AOOO] > 0 |THEN|
+      gyak^sor 7 OK Jogosultsag AOOO
     |ELSE|
-      [#IF [#FILEINFO /CODE/ [f]] = 101 AND [#FILEINFO /EOF/ [f]] > 0 |THEN|
-        gyak^sor 5 OK JEGYZET szovegfajl
-      |ELSE|
-        gyak^sor 5 MEG JEGYZET szovegfajl (nem 101-es kodu, vagy ures)
-      ]
+      gyak^sor 7 MEG Jogosultsag AOOO (FILEINFO NAPLO: RWEP oszlop)
     ]
+  ]
 
-    == 6. masolas (JEGYZET2), atnevezes (JEGYZ3), ADAT torlese
-    [#IF [#FILEINFO /EXISTENCE/ [gyak^sv].JEGYZ3] |THEN|
-      [#IF [#FILEINFO /EXISTENCE/ [gyak^sv].JEGYZET2] |THEN|
-        gyak^sor 6 MEG Masolas, atnevezes, torles (JEGYZET2 meg megvan)
-      |ELSE|
-        [#IF [#FILEINFO /EXISTENCE/ [gyak^sv].ADAT] |THEN|
-          gyak^sor 6 MEG Masolas, atnevezes, torles (az ADAT meg megvan)
-        |ELSE|
-          gyak^sor 6 OK Masolas, atnevezes, torles
-        ]
-      ]
-    |ELSE|
-      gyak^sor 6 MEG Masolas, atnevezes, torles (nincs JEGYZ3 fajl)
-    ]
+  == 8-10: nem hagy ellenorizheto nyomot
+  gyak^sor 8 ONE Processzek - STATUS *, TERM: latod a TACL-odat?
+  gyak^sor 9 ONE Spooler - megtalaltad es torolted a #GYAK jobot?
+  gyak^sor 10 ONE Hibaszam - nem letezo fajl: ERROR 11
 
-    == 7. NAPLO jogosultsaga: AOOO
-    #SET f [gyak^sv].NAPLO
-    [#IF NOT [#FILEINFO /EXISTENCE/ [f]] |THEN|
-      gyak^sor 7 MEG Jogosultsag AOOO (nincs NAPLO fajl)
-    |ELSE|
-      #SET fi
-      FUP /OUTV fi/ INFO [f], DETAIL
-      [#IF [#CHARFIND fi 1 AOOO] > 0 |THEN|
-        gyak^sor 7 OK Jogosultsag AOOO
-      |ELSE|
-        gyak^sor 7 MEG Jogosultsag AOOO (FILEINFO NAPLO: RWEP oszlop)
-      ]
-    ]
-
-    == 8-10: nem hagy ellenorizheto nyomot
-    gyak^sor 8 ONE Processzek - STATUS *, TERM: latod a TACL-odat?
-    gyak^sor 9 ONE Spooler - megtalaltad es torolted a #GYAK jobot?
-    gyak^sor 10 ONE Hibaszam - nem letezo fajl: ERROR 11
-
-    #OUTPUT ----------------------------------------------------------------
-    #OUTPUT Eredmeny: [gyak^k] / [gyak^n] automatikusan ellenorzott feladat kesz
-    [#IF gyak^k = gyak^n |THEN|
-      #OUTPUT Gratulalok, minden ellenorizheto feladat kesz!
-    ]
+  #OUTPUT ----------------------------------------------------------------
+  #OUTPUT Eredmeny: [gyak^k] / [gyak^n] automatikusan ellenorzott feladat kesz
+  [#IF gyak^k = gyak^n |THEN|
+    #OUTPUT Gratulalok, minden ellenorizheto feladat kesz!
   ]
 ]
 #UNFRAME
 
 ?SECTION gyaktorol MACRO
 #FRAME
-#PUSH gyak^vol gyak^lib gyak^az gyak^sv gyak^ok junk lst
+#PUSH gyak^sv gyak^lib junk lst
 gyak^cfg
-#SET gyak^az %1%
-gyak^sv
-[#IF gyak^ok |THEN|
-  == vedelem: csak a gyakorlo kotet GYAK... alkotete torolheto
-  [#IF [#CHARFIND gyak^sv 1 [gyak^vol].GYAK] <> 1 |THEN|
-    #OUTPUT HIBA: [gyak^sv] nem gyakorlo alkotet, nem torlom.
+#SET lst [#FILENAMES [gyak^sv].*]
+[#IF [#EMPTYV lst] |THEN|
+  #OUTPUT A homokozo ures vagy nem letezik: [gyak^sv]
+|ELSE|
+  #OUTPUT Torlom: [lst]
+  FUP /OUTV junk/ PURGE [gyak^sv].*!
+  #SET lst [#FILENAMES [gyak^sv].*]
+  [#IF [#EMPTYV lst] |THEN|
+    #OUTPUT A homokozo torolve: [gyak^sv]
   |ELSE|
-    #SET lst [#FILENAMES [gyak^sv].*]
-    [#IF [#EMPTYV lst] |THEN|
-      #OUTPUT A homokozo ures vagy nem letezik: [gyak^sv]
-    |ELSE|
-      #OUTPUT Torlom: [lst]
-      FUP /OUTV junk/ PURGE [gyak^sv].*!
-      #SET lst [#FILENAMES [gyak^sv].*]
-      [#IF [#EMPTYV lst] |THEN|
-        #OUTPUT A homokozo torolve: [gyak^sv]
-      |ELSE|
-        #OUTPUT Nem minden fajl torlodott (pl. nyitva van). A FUP uzenete:
-        #OUTPUTV junk
-      ]
-    ]
+    #OUTPUT Nem minden fajl torlodott (pl. nyitva van). A FUP uzenete:
+    #OUTPUTV junk
   ]
 ]
 #UNFRAME

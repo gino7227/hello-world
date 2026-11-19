@@ -194,8 +194,7 @@ ne törölj, ne nevezz át.</strong></td>
 </tr>
 <tr class="even">
 <td><strong>Gyakorolni csak a saját gyakorló alkötetedben</strong>
-(<code>$HD1.GYAK&lt;monogram&gt;</code>, pl. <code>$HD1.GYAKAB</code>)
-szabad.</td>
+(<code>$HD1.GYAK</code>) szabad.</td>
 <td>Ott nem ronthatsz el semmit.</td>
 </tr>
 <tr class="odd">
@@ -228,12 +227,12 @@ nyomsz.</strong></td>
 <code>$</code> jellel kezdődik, pl. <code>$HD1</code>,
 <code>$SYSTEM</code>.</li>
 <li><strong>Subvolume (alkötet):</strong> a kötet „mappája”, pl.
-<code>GYAKAB</code>. Csak egy szint van – alkötetben nincs további
+<code>GYAK</code>. Csak egy szint van – alkötetben nincs további
 alkötet.</li>
 <li><strong>Fájl:</strong> az alkötetben, pl. <code>MINTA</code>.</li>
 </ul>
 <h3 id="12-fájlnév">1.2 Fájlnév</h3>
-<pre><code>\EH06.$HD1.GYAKAB.MINTA
+<pre><code>\EH06.$HD1.GYAK.MINTA
   │      │    │    └── fájl      (max. 8 karakter, betűvel kezdődik)
   │      │    └─────── alkötet   (max. 8 karakter, betűvel kezdődik)
   │      └──────────── kötet     ($ jellel kezdődik)
@@ -323,9 +322,9 @@ vagyok</h3>
 WHO                            == ki vagyok, mi az alapértelmezett kötet/alkötet
 LOGOFF                         == kilépés</code></pre>
 <p>A TACL promptja megmutatja az aktuális kötetet/alkötetet és a parancs
-sorszámát, pl. <code>$HD1 GYAKAB 12&gt;</code>.</p>
+sorszámát, pl. <code>$HD1 GYAK 12&gt;</code>.</p>
 <h3 id="22-alapértelmezett-hely">2.2 Alapértelmezett hely</h3>
-<pre><code>VOLUME $HD1.GYAKAB               == ide „állsz be”; utána elég a rövid fájlnév</code></pre>
+<pre><code>VOLUME $HD1.GYAK               == ide „állsz be”; utána elég a rövid fájlnév</code></pre>
 <h3 id="23-hasznos-tacl-trükkök">2.3 Hasznos TACL-trükkök</h3>
 <table>
 <thead>
@@ -358,7 +357,7 @@ sorszámát, pl. <code>$HD1 GYAKAB 12&gt;</code>.</p>
 <h3 id="31-listázás-információ-csak-olvas--mindig-biztonságos">3.1
 Listázás, információ (csak olvas – mindig biztonságos)</h3>
 <pre><code>FILES                          == az aktuális alkötet fájljai
-FILES $HD1.GYAKAB               == egy adott alkötet fájljai
+FILES $HD1.GYAK               == egy adott alkötet fájljai
 FILEINFO                       == fájlok kóddal, mérettel (EOF), dátummal, tulajdonossal
 FILEINFO MINTA                 == egy fájlé
 FILEINFO PT*                   == &quot;PT&quot;-vel kezdődő fájlok (* = bármi)
@@ -568,15 +567,13 @@ jelentenek</h2>
 <hr />
 <h2 id="7-gyakorló-feladatok">7. Gyakorló feladatok</h2>
 <h3 id="70-a-homokozó">7.0 A homokozó</h3>
-<p>A feladatokat egy saját <strong>homokozóban</strong> (gyakorló
-alkötetben) végzed a <code>\EH06</code> rendszer <code>$HD1</code>
-kötetén. A homokozót és az ellenőrzést a <code>GYAK</code> makrók
-kezelik (<code>AB</code> helyett a saját monogramod, legfeljebb 4
-betű):</p>
+<p>A feladatokat a <strong>homokozóban</strong> (gyakorló alkötetben)
+végzed: <code>\EH06.$HD1.GYAK</code>. A homokozót és az ellenőrzést a
+<code>GYAK</code> makrók kezelik:</p>
 <pre><code>LOAD /KEEP 1/ $HD1.OKTATAS.GYAK      == a makrók betöltése (minden belépés után)
-GYAKINIT AB                          == homokozó létrehozása: $HD1.GYAKAB
-GYAKCHK AB                           == hol tartok? (feladatonként OK / MEG NEM)
-GYAKTOROL AB                         == a homokozó törlése (újrakezdéshez)</code></pre>
+GYAKINIT                             == homokozó létrehozása: $HD1.GYAK
+GYAKCHK                              == hol tartok? (feladatonként OK / MEG NEM)
+GYAKTOROL                            == a homokozó törlése (újrakezdéshez)</code></pre>
 <p>A homokozóban induláskor három fájl van: <strong>MINTA</strong>
 (szöveges, EDIT), <strong>ADAT</strong> (entry-sequenced),
 <strong>KULCS</strong> (key-sequenced).</p>
@@ -616,12 +613,12 @@ keresd meg a PERUSE-ban, nézd meg, majd töröld a jobot.</li>
 <li><strong>Hibaüzenet.</strong> Kérd le egy nem létező fájl adatait.
 Milyen hibaszámot kaptál, és mit jelent?</li>
 </ol>
-<p>Időnként futtasd a <code>GYAKCHK AB</code>-t, és nézd meg, hol
+<p>Időnként futtasd a <code>GYAKCHK</code>-t, és nézd meg, hol
 tartasz.</p>
 <h3 id="megoldások">Megoldások</h3>
 <p><em>(Előbb próbáld meg magad!)</em></p>
 <pre><code>1.  WHO
-    VOLUME $HD1.GYAKAB
+    VOLUME $HD1.GYAK
 2.  FILEINFO                                   == az EDIT fájl kódja 101
 3.  FUP INFO ADAT, DETAIL
     FUP INFO KULCS, DETAIL

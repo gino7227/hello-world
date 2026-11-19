@@ -11,7 +11,7 @@ A NonStop éles rendszeren a banki tranzakciók valós időben futnak. Néhány 
 | Szabály | Miért |
 |---|---|
 | **Éles BASE24-fájlokat (PTLF, TLF, CAF, PBF stb.) soha ne írj, ne törölj, ne nevezz át.** | Leállhat a kártyaforgalom. Olvasni (pl. `FILEINFO`, `FUP INFO`) szabad. |
-| **Gyakorolni csak a saját gyakorló alkötetedben** (`$HD1.GYAK<monogram>`, pl. `$HD1.GYAKAB`) szabad. | Ott nem ronthatsz el semmit. |
+| **Gyakorolni csak a saját gyakorló alkötetedben** (`$HD1.GYAK`) szabad. | Ott nem ronthatsz el semmit. |
 | **`STOP` csak olyan processzre, amit te indítottál.** | Egy rendszer- vagy BASE24-processz leállítása üzemzavart okoz. |
 | **A `!` a `FUP PURGE` végén megerősítés nélkül töröl.** | Kezdőként mindig `!` nélkül használd, és olvasd el, mit kérdez. |
 | **Ha bizonytalan vagy, kérdezz, mielőtt Entert nyomsz.** | |
@@ -24,12 +24,12 @@ A NonStop éles rendszeren a banki tranzakciók valós időben futnak. Néhány 
 - **Node (rendszer):** egy NonStop gép, neve `\` jellel kezdődik, pl. `\EH06`.
 - **CPU:** a rendszerben több processzor van (0, 1, 2, …). Ha az egyik kiesik, a többi átveszi a munkát – ezért „NonStop”.
 - **Volume (kötet):** egy logikai lemez, neve `$` jellel kezdődik, pl. `$HD1`, `$SYSTEM`.
-- **Subvolume (alkötet):** a kötet „mappája”, pl. `GYAKAB`. Csak egy szint van – alkötetben nincs további alkötet.
+- **Subvolume (alkötet):** a kötet „mappája”, pl. `GYAK`. Csak egy szint van – alkötetben nincs további alkötet.
 - **Fájl:** az alkötetben, pl. `MINTA`.
 
 ### 1.2 Fájlnév
 ```
-\EH06.$HD1.GYAKAB.MINTA
+\EH06.$HD1.GYAK.MINTA
   │      │    │    └── fájl      (max. 8 karakter, betűvel kezdődik)
   │      │    └─────── alkötet   (max. 8 karakter, betűvel kezdődik)
   │      └──────────── kötet     ($ jellel kezdődik)
@@ -72,11 +72,11 @@ LOGON csoport.felhasznalo      == belépés (jelszót kér)
 WHO                            == ki vagyok, mi az alapértelmezett kötet/alkötet
 LOGOFF                         == kilépés
 ```
-A TACL promptja megmutatja az aktuális kötetet/alkötetet és a parancs sorszámát, pl. `$HD1 GYAKAB 12>`.
+A TACL promptja megmutatja az aktuális kötetet/alkötetet és a parancs sorszámát, pl. `$HD1 GYAK 12>`.
 
 ### 2.2 Alapértelmezett hely
 ```
-VOLUME $HD1.GYAKAB               == ide „állsz be”; utána elég a rövid fájlnév
+VOLUME $HD1.GYAK               == ide „állsz be”; utána elég a rövid fájlnév
 ```
 
 ### 2.3 Hasznos TACL-trükkök
@@ -94,7 +94,7 @@ VOLUME $HD1.GYAKAB               == ide „állsz be”; utána elég a rövid f
 ### 3.1 Listázás, információ (csak olvas – mindig biztonságos)
 ```
 FILES                          == az aktuális alkötet fájljai
-FILES $HD1.GYAKAB               == egy adott alkötet fájljai
+FILES $HD1.GYAK               == egy adott alkötet fájljai
 FILEINFO                       == fájlok kóddal, mérettel (EOF), dátummal, tulajdonossal
 FILEINFO MINTA                 == egy fájlé
 FILEINFO PT*                   == "PT"-vel kezdődő fájlok (* = bármi)
@@ -203,13 +203,13 @@ Bármilyen hibaszám jelentése: `ERROR 48` (TACL-ban).
 ## 7. Gyakorló feladatok
 
 ### 7.0 A homokozó
-A feladatokat egy saját **homokozóban** (gyakorló alkötetben) végzed a `\EH06` rendszer `$HD1` kötetén. A homokozót és az ellenőrzést a `GYAK` makrók kezelik (`AB` helyett a saját monogramod, legfeljebb 4 betű):
+A feladatokat a **homokozóban** (gyakorló alkötetben) végzed: `\EH06.$HD1.GYAK`. A homokozót és az ellenőrzést a `GYAK` makrók kezelik:
 
 ```
 LOAD /KEEP 1/ $HD1.OKTATAS.GYAK      == a makrók betöltése (minden belépés után)
-GYAKINIT AB                          == homokozó létrehozása: $HD1.GYAKAB
-GYAKCHK AB                           == hol tartok? (feladatonként OK / MEG NEM)
-GYAKTOROL AB                         == a homokozó törlése (újrakezdéshez)
+GYAKINIT                             == homokozó létrehozása: $HD1.GYAK
+GYAKCHK                              == hol tartok? (feladatonként OK / MEG NEM)
+GYAKTOROL                            == a homokozó törlése (újrakezdéshez)
 ```
 A homokozóban induláskor három fájl van: **MINTA** (szöveges, EDIT), **ADAT** (entry-sequenced), **KULCS** (key-sequenced).
 
@@ -236,7 +236,7 @@ Az „ONELLEN.” (önellenőrzés) feladatok nem hagynak nyomot a rendszerben; 
 9. **Spooler.** Küldd a homokozó fájllistáját a spoolerbe, keresd meg a PERUSE-ban, nézd meg, majd töröld a jobot.
 10. **Hibaüzenet.** Kérd le egy nem létező fájl adatait. Milyen hibaszámot kaptál, és mit jelent?
 
-Időnként futtasd a `GYAKCHK AB`-t, és nézd meg, hol tartasz.
+Időnként futtasd a `GYAKCHK`-t, és nézd meg, hol tartasz.
 
 ### Megoldások
 
@@ -244,7 +244,7 @@ Időnként futtasd a `GYAKCHK AB`-t, és nézd meg, hol tartasz.
 
 ```
 1.  WHO
-    VOLUME $HD1.GYAKAB
+    VOLUME $HD1.GYAK
 2.  FILEINFO                                   == az EDIT fájl kódja 101
 3.  FUP INFO ADAT, DETAIL
     FUP INFO KULCS, DETAIL
