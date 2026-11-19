@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>NonStop alapok</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">NonStop alapok</h1>
+</header>
+<h1 id="hp-nonstop-alapok--fájlok-processzek-spooler">HP NonStop alapok
+– fájlok, processzek, spooler</h1>
+<p><em>Bevezető új kollégáknak. Előismeret nem kell. A második rész
+(BASE24: PTLF, TLF, napváltás, saját eszközök) külön cikkben
+lesz.</em></p>
+<hr />
+<h2 id="0-mielőtt-bármit-begépelsz--biztonsági-szabályok">0. Mielőtt
+bármit begépelsz – biztonsági szabályok</h2>
+<p>A NonStop éles rendszeren a banki tranzakciók valós időben futnak.
+Néhány parancs visszavonhatatlan.</p>
+<table>
+<thead>
+<tr class="header">
+<th>Szabály</th>
+<th>Miért</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Éles BASE24-fájlokat (PTLF, TLF, CAF, PBF stb.) soha ne írj,
+ne törölj, ne nevezz át.</strong></td>
+<td>Leállhat a kártyaforgalom. Olvasni (pl. <code>FILEINFO</code>,
+<code>FUP INFO</code>) szabad.</td>
+</tr>
+<tr class="even">
+<td><strong>Gyakorolni csak a saját gyakorló alkötetedben</strong> (pl.
+<code>$DATA.GYAKxxxx</code>) szabad.</td>
+<td>Ott nem ronthatsz el semmit.</td>
+</tr>
+<tr class="odd">
+<td><strong><code>STOP</code> csak olyan processzre, amit te
+indítottál.</strong></td>
+<td>Egy rendszer- vagy BASE24-processz leállítása üzemzavart okoz.</td>
+</tr>
+<tr class="even">
+<td><strong>A <code>!</code> a <code>FUP PURGE</code> végén megerősítés
+nélkül töröl.</strong></td>
+<td>Kezdőként mindig <code>!</code> nélkül használd, és olvasd el, mit
+kérdez.</td>
+</tr>
+<tr class="odd">
+<td><strong>Ha bizonytalan vagy, kérdezz, mielőtt Entert
+nyomsz.</strong></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="1-alapfogalmak">1. Alapfogalmak</h2>
+<h3 id="11-a-rendszer-felépítése">1.1 A rendszer felépítése</h3>
+<ul>
+<li><strong>Node (rendszer):</strong> egy NonStop gép, neve
+<code>\</code> jellel kezdődik, pl. <code>\EH08</code>.</li>
+<li><strong>CPU:</strong> a rendszerben több processzor van (0, 1, 2,
+…). Ha az egyik kiesik, a többi átveszi a munkát – ezért „NonStop”.</li>
+<li><strong>Volume (kötet):</strong> egy logikai lemez, neve
+<code>$</code> jellel kezdődik, pl. <code>$DATA</code>,
+<code>$SYSTEM</code>.</li>
+<li><strong>Subvolume (alkötet):</strong> a kötet „mappája”, pl.
+<code>GYAK</code>. Csak egy szint van – alkötetben nincs további
+alkötet.</li>
+<li><strong>Fájl:</strong> az alkötetben, pl. <code>MINTA</code>.</li>
+</ul>
+<h3 id="12-fájlnév">1.2 Fájlnév</h3>
+<pre><code>\EH08.$DATA.GYAK.MINTA
+  │      │    │    └── fájl      (max. 8 karakter, betűvel kezdődik)
+  │      │    └─────── alkötet   (max. 8 karakter, betűvel kezdődik)
+  │      └──────────── kötet     ($ jellel kezdődik)
+  └─────────────────── node      (\ jellel; a saját node-on elhagyható)</code></pre>
+<ul>
+<li>Kis- és nagybetű mindegy (<code>minta</code> =
+<code>MINTA</code>).</li>
+<li>Ha beállítottad az alapértelmezett kötetet és alkötetet (lásd 2.2),
+elég a rövid név: <code>MINTA</code>.</li>
+</ul>
+<h3 id="13-fájlkódok-code">1.3 Fájlkódok (CODE)</h3>
+<p>A fájlkód megmondja, mi van a fájlban:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Kód</th>
+<th>Jelentés</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>101</td>
+<td>EDIT fájl (szöveg: forrásprogram, makró, jegyzet)</td>
+</tr>
+<tr class="even">
+<td>500 / 800 / 700</td>
+<td>futtatható program (x86 / Itanium / MIPS rendszeren)</td>
+</tr>
+<tr class="odd">
+<td>0</td>
+<td>adatfájl (általános)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="14-fájltípusok">1.4 Fájltípusok</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Típus</th>
+<th>FUP-ban</th>
+<th>Jellemző</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Unstructured</td>
+<td><code>TYPE U</code></td>
+<td>bájtfolyam, nincs rekordszerkezet (EDIT fájl is ilyen alapon)</td>
+</tr>
+<tr class="even">
+<td>Entry-sequenced</td>
+<td><code>TYPE E</code></td>
+<td>rekordok érkezési sorrendben, a végére íródik (pl. PTLF, TLF
+naplók)</td>
+</tr>
+<tr class="odd">
+<td>Key-sequenced</td>
+<td><code>TYPE K</code></td>
+<td>rekordok kulcs szerint rendezve, kulccsal kereshető (pl. CAF,
+PBF)</td>
+</tr>
+<tr class="even">
+<td>Relative</td>
+<td><code>TYPE R</code></td>
+<td>rekordok sorszám szerint</td>
+</tr>
+</tbody>
+</table>
+<h3 id="15-processz">1.5 Processz</h3>
+<ul>
+<li>A <strong>processz</strong> egy futó program. Lehet neve
+(<code>$</code> jellel, pl. <code>$NAPI</code>) vagy név nélküli.</li>
+<li><strong>Processzpár:</strong> sok rendszer- és BASE24-processz két
+példányban fut két külön CPU-n: <strong>primary</strong> (dolgozik) és
+<strong>backup</strong> (készenlétben). Ha a primary CPU kiesik, a
+backup azonnal átveszi.</li>
+<li>Minden processzt a CPU száma és egy sorszám (PIN) azonosít, pl.
+<code>3,210</code>.</li>
+</ul>
+<hr />
+<h2 id="2-a-tacl--a-parancssor">2. A TACL – a parancssor</h2>
+<p>A <strong>TACL</strong> a NonStop parancsértelmezője (mint Windows-on
+a cmd, Linuxon a bash).</p>
+<h3 id="21-belépés-kilépés-ki-vagyok">2.1 Belépés, kilépés, ki
+vagyok</h3>
+<pre><code>LOGON csoport.felhasznalo      == belépés (jelszót kér)
+WHO                            == ki vagyok, mi az alapértelmezett kötet/alkötet
+LOGOFF                         == kilépés</code></pre>
+<p>A TACL promptja megmutatja az aktuális kötetet/alkötetet és a parancs
+sorszámát, pl. <code>$DATA GYAK 12&gt;</code>.</p>
+<h3 id="22-alapértelmezett-hely">2.2 Alapértelmezett hely</h3>
+<pre><code>VOLUME $DATA.GYAK               == ide „állsz be”; utána elég a rövid fájlnév</code></pre>
+<h3 id="23-hasznos-tacl-trükkök">2.3 Hasznos TACL-trükkök</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Parancs</th>
+<th>Jelentés</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>HISTORY</code></td>
+<td>az utolsó parancsok listája</td>
+</tr>
+<tr class="even">
+<td><code>FC</code></td>
+<td>az utolsó parancs javítása és újrafuttatása</td>
+</tr>
+<tr class="odd">
+<td><code>FC 12</code> / <code>FC fup</code></td>
+<td>a 12. parancs / a legutóbbi „fup…” kezdetű parancs</td>
+</tr>
+<tr class="even">
+<td><code>== szöveg</code></td>
+<td>megjegyzés (a sor végéig)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="3-fájlműveletek">3. Fájlműveletek</h2>
+<h3 id="31-listázás-információ-csak-olvas--mindig-biztonságos">3.1
+Listázás, információ (csak olvas – mindig biztonságos)</h3>
+<pre><code>FILES                          == az aktuális alkötet fájljai
+FILES $DATA.GYAK               == egy adott alkötet fájljai
+FILEINFO                       == fájlok kóddal, mérettel (EOF), dátummal, tulajdonossal
+FILEINFO MINTA                 == egy fájlé
+FILEINFO PT*                   == &quot;PT&quot;-vel kezdődő fájlok (* = bármi)
+FUP INFO MINTA, DETAIL         == minden részlet: típus, rekordhossz, blokkméret, kulcsok…</code></pre>
+<p>A <code>FILEINFO</code> oszlopai: <strong>CODE</strong> (fájlkód),
+<strong>EOF</strong> (méret bájtban), <strong>LAST MODIFIED</strong>
+(utolsó módosítás), <strong>OWNER</strong> (tulajdonos),
+<strong>RWEP</strong> (jogosultság, lásd 3.4).</p>
+<h3 id="32-fup--file-utility-program">3.2 FUP – File Utility
+Program</h3>
+<p>A <code>FUP</code> a fájlkezelés fő eszköze. Egy parancs:
+<code>FUP &lt;parancs&gt;</code>; vagy belépsz (<code>FUP</code>), több
+parancsot adsz, majd <code>EXIT</code>.</p>
+<table>
+<thead>
+<tr class="header">
+<th>Parancs</th>
+<th>Mit csinál</th>
+<th>Példa</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>INFO</code></td>
+<td>információ</td>
+<td><code>FUP INFO MINTA, DETAIL</code></td>
+</tr>
+<tr class="even">
+<td><code>CREATE</code></td>
+<td>új fájl létrehozása</td>
+<td><code>FUP CREATE NAPLO, TYPE E, REC 200</code></td>
+</tr>
+<tr class="odd">
+<td><code>DUP</code></td>
+<td>fájl másolása (új fájl jön létre)</td>
+<td><code>FUP DUP MINTA, MINTA2</code></td>
+</tr>
+<tr class="even">
+<td><code>COPY</code></td>
+<td>rekordok másolása; cél nélkül a képernyőre listáz</td>
+<td><code>FUP COPY MINTA</code></td>
+</tr>
+<tr class="odd">
+<td><code>RENAME</code></td>
+<td>átnevezés</td>
+<td><code>FUP RENAME MINTA2, MINTA3</code></td>
+</tr>
+<tr class="even">
+<td><code>PURGE</code></td>
+<td><strong>törlés</strong> (megerősítést kér)</td>
+<td><code>FUP PURGE MINTA3</code></td>
+</tr>
+<tr class="odd">
+<td><code>SECURE</code></td>
+<td>jogosultság beállítása</td>
+<td><code>FUP SECURE NAPLO, "NUNU"</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="33-szöveges-edit-fájl-szerkesztése">3.3 Szöveges (EDIT) fájl
+szerkesztése</h3>
+<pre><code>TEDIT JEGYZET                  == teljes képernyős szerkesztő (ha nincs ilyen fájl, létrehozza)
+EDIT JEGYZET                   == soronkénti szerkesztő (régebbi)</code></pre>
+<h3 id="34-jogosultság-rwep">3.4 Jogosultság (RWEP)</h3>
+<p>A <code>FILEINFO</code> RWEP oszlopa négy betű: <strong>R</strong>ead
+(olvasás), <strong>W</strong>rite (írás), <strong>E</strong>xecute
+(futtatás), <strong>P</strong>urge (törlés). Mindegyik helyen egy betű
+mondja meg, <em>ki</em> teheti meg:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Betű</th>
+<th>Ki</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>N</code></td>
+<td>bárki a hálózatban</td>
+</tr>
+<tr class="even">
+<td><code>A</code></td>
+<td>bárki ezen a node-on</td>
+</tr>
+<tr class="odd">
+<td><code>G</code> / <code>C</code></td>
+<td>a tulajdonos csoportja (helyi / hálózati)</td>
+</tr>
+<tr class="even">
+<td><code>O</code> / <code>U</code></td>
+<td>csak a tulajdonos (helyi / hálózati)</td>
+</tr>
+<tr class="odd">
+<td><code>-</code></td>
+<td>csak a super ID</td>
+</tr>
+</tbody>
+</table>
+<p>Pl. <code>NUNU</code>: bárki olvashatja és futtathatja, de írni és
+törölni csak a tulajdonos tudja. Ezen felül a <strong>Safeguard</strong>
+további szabályokat adhat – ha valamire „security violation” hibát
+kapsz, az nem a te hibád, szólj.</p>
+<hr />
+<h2 id="4-processzek">4. Processzek</h2>
+<h3 id="41-processzek-megtekintése-csak-olvas--biztonságos">4.1
+Processzek megtekintése (csak olvas – biztonságos)</h3>
+<pre><code>STATUS *, TERM                 == a terminálodról indított processzek
+STATUS *, USER                 == a felhasználód összes processze
+STATUS $NAPI                   == egy név szerinti processz
+STATUS $NAPI, DETAIL           == részletesen (program, CPU, prioritás…)
+PPD $NAPI                      == processzpár: primary és backup CPU,PIN</code></pre>
+<h3 id="42-program-futtatása">4.2 Program futtatása</h3>
+<pre><code>RUN PROG paraméterek                           == futtatás, megvárja a végét
+PROG paraméterek                               == ugyanaz (a RUN elhagyható)
+RUN PROG /OUT $S.#LISTA/ paraméterek           == kimenet a spoolerbe
+RUN PROG /NAME $GY01, NOWAIT/ paraméterek      == háttérben, $GY01 néven</code></pre>
+<p>A <code>/…/</code> közötti rész a <strong>futtatási opciók</strong>:
+<code>NAME</code> (processznév), <code>NOWAIT</code> (ne várja meg),
+<code>OUT</code> (kimenet helye), <code>IN</code> (bemenet),
+<code>CPU n</code> (melyik CPU-n).</p>
+<h3 id="43-processz-leállítása">4.3 Processz leállítása</h3>
+<pre><code>STOP $GY01                     == CSAK a saját processzedet!</code></pre>
+<p>Előtte mindig nézd meg, kié és mi az:
+<code>STATUS $GY01, DETAIL</code>.</p>
+<hr />
+<h2 id="5-spooler-és-peruse">5. Spooler és PERUSE</h2>
+<p>A <strong>spooler</strong> a nyomtatási sor: a programok ide írhatják
+a kimenetüket, ahonnan később megnézhető vagy kinyomtatható. A
+<code>/OUT …/</code> opciót programok kapják (pl. <code>FUP</code>,
+saját programok); a TACL beépített parancsai (pl. <code>FILEINFO</code>)
+nem.</p>
+<pre><code>RUN PROG /OUT $S.#GYAK/        == a kimenet a spoolerbe, a #GYAK csoportba
+PERUSE                         == a spooler-jobok böngészője</code></pre>
+<p>PERUSE-ban:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Parancs</th>
+<th>Mit csinál</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>JOB</code></td>
+<td>a jobjaid listája</td>
+</tr>
+<tr class="even">
+<td><code>JOB 1234</code></td>
+<td>egy job kiválasztása</td>
+</tr>
+<tr class="odd">
+<td><code>LIST</code></td>
+<td>a kiválasztott job tartalma (lapozás: Enter)</td>
+</tr>
+<tr class="even">
+<td><code>DEL</code></td>
+<td>a kiválasztott job törlése (csak a sajátodat!)</td>
+</tr>
+<tr class="odd">
+<td><code>EXIT</code></td>
+<td>kilépés</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="6-hibaüzenetek--mit-jelentenek">6. Hibaüzenetek – mit
+jelentenek</h2>
+<p>A NonStop a hibákat számmal jelzi
+(<code>FILE SYSTEM ERROR 11</code>). A leggyakoribbak:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Hiba</th>
+<th>Jelentés</th>
+<th>Teendő</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>11</td>
+<td>nincs ilyen fájl / rekord</td>
+<td>elírtad a nevet, vagy rossz alkötetben vagy (<code>WHO</code>)</td>
+</tr>
+<tr class="even">
+<td>10</td>
+<td>a fájl már létezik</td>
+<td>más nevet adj, vagy előbb nézd meg, mi az</td>
+</tr>
+<tr class="odd">
+<td>12</td>
+<td>a fájlt más használja</td>
+<td>várj, vagy kérdezd meg, ki használja</td>
+</tr>
+<tr class="even">
+<td>14</td>
+<td>nincs ilyen eszköz / processz</td>
+<td>elírtad a <code>$</code> nevet</td>
+</tr>
+<tr class="odd">
+<td>48</td>
+<td>security violation</td>
+<td>nincs jogosultságod – szólj</td>
+</tr>
+</tbody>
+</table>
+<p>Bármilyen hibaszám jelentése: <code>ERROR 48</code> (TACL-ban).</p>
+<hr />
+<h2 id="7-gyakorló-feladatok">7. Gyakorló feladatok</h2>
+<p><em>Csak a saját gyakorló alkötetedben! A gyakorló alkötet nevét a
+mentorod adja meg; a példákban <code>$DATA.GYAK</code>.</em></p>
+<ol type="1">
+<li><strong>Hol vagyok?</strong> Nézd meg, ki vagy és mi az
+alapértelmezett helyed, majd állj be a gyakorló alkötetbe.</li>
+<li><strong>Mi van itt?</strong> Listázd ki az alkötet fájljait kóddal
+és mérettel. Melyik EDIT fájl?</li>
+<li><strong>Részletek.</strong> Kérd le egy fájl összes adatát. Milyen
+típusú, mekkora a rekordhossz?</li>
+<li><strong>Új fájl.</strong> Hozz létre egy entry-sequenced fájlt
+<code>NAPLO</code> néven, 200 bájtos rekordokkal. Ellenőrizd.</li>
+<li><strong>Szöveg.</strong> Hozz létre egy <code>JEGYZET</code> nevű
+szöveges fájlt, írj bele két sort, mentsd el, és listázd ki a
+tartalmát.</li>
+<li><strong>Másolás, átnevezés, törlés.</strong> Másold le a
+<code>JEGYZET</code>-et <code>JEGYZET2</code> néven, nevezd át
+<code>JEGYZ3</code>-ra, majd töröld (megerősítéssel!).</li>
+<li><strong>Jogosultság.</strong> Állítsd be a <code>NAPLO</code>-t úgy,
+hogy bárki olvashassa, de csak te írhasd és törölhesd. Ellenőrizd.</li>
+<li><strong>Processzek.</strong> Nézd meg, milyen processzeid futnak a
+terminálodról.</li>
+<li><strong>Spooler.</strong> Küldd a gyakorló alkötet fájllistáját a
+spoolerbe, keresd meg a PERUSE-ban, nézd meg, majd töröld a jobot.</li>
+<li><strong>Hibaüzenet.</strong> Kérd le egy nem létező fájl adatait.
+Milyen hibaszámot kaptál, és mit jelent?</li>
+</ol>
+<h3 id="megoldások">Megoldások</h3>
+<p><em>(Előbb próbáld meg magad!)</em></p>
+<pre><code>1.  WHO
+    VOLUME $DATA.GYAK
+2.  FILEINFO                                   == az EDIT fájl kódja 101
+3.  FUP INFO MINTA, DETAIL
+4.  FUP CREATE NAPLO, TYPE E, REC 200
+    FUP INFO NAPLO, DETAIL
+5.  TEDIT JEGYZET                              == írj, mentés és kilépés
+    FUP COPY JEGYZET                           == a tartalom a képernyőre
+6.  FUP DUP JEGYZET, JEGYZET2
+    FUP RENAME JEGYZET2, JEGYZ3
+    FUP PURGE JEGYZ3                           == megerősítés: Y
+7.  FUP SECURE NAPLO, &quot;NUNU&quot;
+    FILEINFO NAPLO                             == RWEP oszlop: NUNU
+8.  STATUS *, TERM
+9.  FUP /OUT $S.#GYAK/ INFO *               == a FUP egy program, ezért kaphat /OUT/-ot
+    PERUSE
+      JOB                                      == keresd meg a #GYAK jobot
+      JOB &lt;szám&gt;
+      LIST
+      DEL
+      EXIT
+10. FILEINFO NINCSILYEN                         == ERROR 11
+    ERROR 11</code></pre>
+<hr />
+<h2 id="8-következő-lépések">8. Következő lépések</h2>
+<ul>
+<li><strong>2. rész:</strong> BASE24 a NonStopon – PTLF és TLF naplók,
+napváltás (20:30), hol vannak a fájlok, és a saját eszközeink
+(<code>PTLFRPT</code>, <code>TLFRPT</code>, <code>TRNLIST</code>,
+<code>TCPRATE</code>, <code>EMSERR</code>).</li>
+<li>Kérdés esetén: a mentorod vagy a csapat.</li>
+</ul>
+</body>
+</html>
