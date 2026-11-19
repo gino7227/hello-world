@@ -273,5 +273,5 @@ Időnként futtasd a `GYAKCHK`-t, és nézd meg, hol tartasz.
 
 ## 8. Következő lépések
 
-- **2. rész:** BASE24 a NonStopon – PTLF és TLF naplók, napváltás (20:30), hol vannak a fájlok, és a saját eszközeink (`PTLFRPT`, `TLFRPT`, `TRNLIST`, `TCPRATE`, `EMSERR`).
+- **2. rész:** BASE24 a NonStopon – a tranzakció útja, a TLF és PTLF naplók, a napváltás (20:30), az EMS és a hálózati kapcsolatok.
 - Kérdés esetén: a mentorod vagy a csapat.

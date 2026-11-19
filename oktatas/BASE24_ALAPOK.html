@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>BASE24 a NonStopon</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">BASE24 a NonStopon</h1>
+</header>
+<h1 id="base24-a-nonstopon--2-rész">BASE24 a NonStopon – 2. rész</h1>
+<p><em>Folytatás a „NonStop alapok” cikkhez. A fájl-, processz- és
+spooler-alapokat ismertnek tekintjük.</em></p>
+<hr />
+<h2 id="0-biztonság--ami-itt-még-fontosabb">0. Biztonság – ami itt még
+fontosabb</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Szabály</th>
+<th>Miért</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>A BASE24 éles fájljait (PTLF, TLF, CAF, PBF, konfigurációs
+fájlok) soha nem írjuk, nem töröljük, nem nevezzük át.</strong></td>
+<td>Megáll a kártyaforgalom vagy elvesznek tranzakciók.</td>
+</tr>
+<tr class="even">
+<td><strong>BASE24-processzt nem állítunk le, nem indítunk el</strong> –
+csak a felelős csapat, egyeztetve.</td>
+<td>Egy rossz <code>STOP</code> az összes ATM-et vagy POS-t
+leállíthatja.</td>
+</tr>
+<tr class="odd">
+<td><strong>A tranzakciós naplókban kártyaadat van</strong> (kártyaszám,
+Track 2, lejárat).</td>
+<td>PCI DSS: kártyaszámot nem másolunk ki, nem küldünk e-mailben, nem
+teszünk képernyőképre.</td>
+</tr>
+<tr class="even">
+<td><strong><code>FUP COPY</code> PTLF-re vagy TLF-re:
+tilos.</strong></td>
+<td>Kilistázná a kártyaadatokat a képernyőre / spoolerbe.</td>
+</tr>
+<tr class="odd">
+<td>Olvasni szabad: <code>FILEINFO</code>,
+<code>FUP INFO … DETAIL</code>, <code>STATUS</code>.</td>
+<td>Ezek nem változtatnak semmit.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="1-mi-a-base24">1. Mi a BASE24?</h2>
+<p>A <strong>BASE24</strong> az ACI Worldwide kártyás tranzakciókezelő
+rendszere; nálunk a <strong>BASE24 classic</strong> fut a NonStopon.
+Feladata: a kártyás tranzakciókat fogadni, eldönteni (vagy továbbítani),
+hogy engedélyezhetők-e, válaszolni, és mindent naplózni.</p>
+<p>Két modulja érint minket:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Modul</th>
+<th>Mit kezel</th>
+<th>Nálunk</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>BASE24-atm</strong></td>
+<td>ATM-tranzakciók</td>
+<td>a <strong>saját ATM-jeink</strong> forgalma (saját és idegen
+kártyával)</td>
+</tr>
+<tr class="even">
+<td><strong>BASE24-pos</strong></td>
+<td>POS (kártyás vásárlás) tranzakciók</td>
+<td>a <strong>saját kártyáink</strong> más bankok POS-terminálján –
+kibocsátói (issuer) oldal</td>
+</tr>
+</tbody>
+</table>
+<p>Két szerep, amit érdemes megkülönböztetni:</p>
+<ul>
+<li><strong>Elfogadó (acquirer):</strong> a mi eszközünkön (ATM)
+használt kártya – lehet saját vagy idegen.</li>
+<li><strong>Kibocsátó (issuer):</strong> a mi kártyánk, bárhol a világon
+– a tranzakció a kártyahálózaton (Visa, Mastercard) érkezik hozzánk
+engedélyezésre.</li>
+</ul>
+<hr />
+<h2 id="2-hogyan-megy-végig-egy-tranzakció">2. Hogyan megy végig egy
+tranzakció?</h2>
+<pre><code>  ATM / POS                                          Engedélyező
+  ─────────                                          ───────────
+  ATM ──► ATM-koncentrátor ──► CLIM ──► Device Handler ─┐
+                                                        ├─► Authorization ──► Host / Interchange
+  POS (más bank) ──► Visa / Mastercard ──► Interchange ─┘        │
+                                       Interface                  ▼
+                                                            HSM (PIN, kriptográfia)</code></pre>
+<ol type="1">
+<li><strong>Fogadás:</strong> az ATM-eink néhány
+<strong>ATM-koncentrátoron</strong> keresztül, TCP-kapcsolattal érik el
+a NonStopot (a hálózati forgalom a <strong>CLIM</strong>-eken megy át).
+A POS-tranzakciók a kártyahálózattól az <strong>Interchange
+Interface</strong> processzen jönnek.</li>
+<li><strong>Authorization:</strong> a BASE24 eldönti, ki engedélyez:
+<ul>
+<li>a bank <strong>hostja</strong> (a számlavezető rendszer), vagy</li>
+<li>a BASE24 maga (pl. lejárt kártya, rossz PIN – ezt helyben is tudja),
+vagy</li>
+<li><strong>STIP</strong> (stand-in processing): ha a host nem érhető
+el, a BASE24 előre beállított szabályok szerint helyettesítőként
+dönt.</li>
+</ul></li>
+<li><strong>HSM:</strong> a PIN-ellenőrzés és a kriptográfiai műveletek
+egy hardveres biztonsági modulban (HSM, pl. Atalla) történnek. A BASE24
+több párhuzamos kapcsolaton, két HSM között elosztva küldi a
+kéréseket.</li>
+<li><strong>Válasz</strong> vissza a terminálnak / hálózatnak, és
+<strong>naplózás</strong> a tranzakciós naplóba (TLF / PTLF).</li>
+</ol>
+<hr />
+<h2 id="3-üzenettípusok-és-válaszkódok">3. Üzenettípusok és
+válaszkódok</h2>
+<h3 id="31-üzenettípusok-iso-8583-alapján">3.1 Üzenettípusok (ISO 8583
+alapján)</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Típus</th>
+<th>Jelentés</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>0200</td>
+<td>engedélyezési kérés (pénzügyi tranzakció)</td>
+</tr>
+<tr class="even">
+<td>0210</td>
+<td>válasz a 0200-ra – <strong>ez kerül a naplóba</strong> a kérés
+eredményével</td>
+</tr>
+<tr class="odd">
+<td>0220</td>
+<td>advice: utólagos értesítés egy már megtörtént döntésről</td>
+</tr>
+<tr class="even">
+<td>0420</td>
+<td><strong>sztornó</strong> (reversal): a tranzakció visszavonása, pl.
+időtúllépés vagy hiba miatt</td>
+</tr>
+</tbody>
+</table>
+<h3 id="32-válaszkódok">3.2 Válaszkódok</h3>
+<p>A BASE24 háromjegyű belső válaszkódokat használ:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Kód</th>
+<th>Jelentés</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>000, 001</strong></td>
+<td>engedélyezve (egyenleginfóval / anélkül)</td>
+</tr>
+<tr class="even">
+<td>003, 004</td>
+<td>engedélyezve (POS: további azonosítás / aláírt bizonylat)</td>
+</tr>
+<tr class="odd">
+<td>050 felett</td>
+<td><strong>elutasítva</strong> – pl. 051 lejárt kártya, 055 nem
+engedélyezett tranzakció, 076 nincs fedezet (POS)</td>
+</tr>
+<tr class="even">
+<td>ATM: 1xx</td>
+<td>az első jegy 1 = <strong>az ATM elnyelte a kártyát</strong> (pl.
+150)</td>
+</tr>
+</tbody>
+</table>
+<p>A teljes kódlista a BASE24-pos és BASE24-atm Transaction Processing
+Manualban, illetve a csapat Confluence-oldalán van.</p>
+<hr />
+<h2 id="4-a-tranzakciós-naplók-tlf-és-ptlf">4. A tranzakciós naplók: TLF
+és PTLF</h2>
+<p>Minden tranzakció (engedélyezett és elutasított is) bekerül egy
+<strong>napi naplófájlba</strong>:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Napló</th>
+<th>Modul</th>
+<th>Fájlnév</th>
+<th>Példa</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>TLF</strong> (Transaction Log File)</td>
+<td>ATM</td>
+<td><code>TLyymmdd</code></td>
+<td><code>TL261102</code> = 2026.11.02. üzleti nap</td>
+</tr>
+<tr class="even">
+<td><strong>PTLF</strong> (POS Transaction Log File)</td>
+<td>POS</td>
+<td><code>POyymmdd</code></td>
+<td><code>PO261102</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="41-jellemzők">4.1 Jellemzők</h3>
+<ul>
+<li><strong>Entry-sequenced</strong> fájl: a rekordok érkezési
+(idő)rendben, a végére íródnak.</li>
+<li><strong>Nagy:</strong> egy napi PTLF nálunk ~3 GB, közel 1 millió
+rekord. Egy rekord egy tranzakció (vagy egy adminisztratív /
+kivétel-bejegyzés).</li>
+<li><strong>Alternatív kulcsok:</strong> a fájlban kártyaszám
+(<code>CR</code>), kereskedő (<code>RT</code>) és terminál + idő
+(<code>TT</code>, <code>TK</code>) szerint is lehet keresni. A kulcsok
+külön fájlokban vannak (lásd <code>FUP INFO … DETAIL</code>:
+<code>ALTKEY</code>, <code>ALTFILE</code>) – akár más köteteken.</li>
+<li>A rekordok szerkezetét a BASE24 <strong>DDL</strong>-je írja le
+(<code>DDLFPTLF</code>, <code>DDLTLF</code>).</li>
+</ul>
+<h3 id="42-rekordtípusok">4.2 Rekordtípusok</h3>
+<p>A rekord elején a <code>REC-TYP</code> mező mondja meg, mi van
+benne:</p>
+<table>
+<thead>
+<tr class="header">
+<th>REC-TYP</th>
+<th>Jelentés</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>00</td>
+<td>kezdő rekord (a fájl létrehozásakor íródik)</td>
+</tr>
+<tr class="even">
+<td>01</td>
+<td><strong>ügyféltranzakció</strong> – a lényeg</td>
+</tr>
+<tr class="odd">
+<td>04</td>
+<td>adminisztratív rekord (pl. ATM-kazettaműveletek,
+terminál-összesítők)</td>
+</tr>
+<tr class="even">
+<td>20–23</td>
+<td>kivétel: a tranzakciót nem sikerült rendesen feldolgozni</td>
+</tr>
+</tbody>
+</table>
+<h3 id="43-néhány-fontos-mező-a-teljesség-igénye-nélkül">4.3 Néhány
+fontos mező (a teljesség igénye nélkül)</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Mező</th>
+<th>Jelentés</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>DAT-TIM</code></td>
+<td>a naplózás időpontja (rendszeridő)</td>
+</tr>
+<tr class="even">
+<td><code>TRAN-DAT</code>, <code>TRAN-TIM</code></td>
+<td>a tranzakció ideje az üzenet szerint (külföldi POS-nál a helyi
+idő!)</td>
+</tr>
+<tr class="odd">
+<td><code>TYP</code></td>
+<td>üzenettípus (0210, 0420 …)</td>
+</tr>
+<tr class="even">
+<td><code>TRAN-CDE</code></td>
+<td>tranzakciókód (pl. POS 10 = vásárlás, ATM 10 =
+készpénzfelvétel)</td>
+</tr>
+<tr class="odd">
+<td><code>RESP-CDE</code></td>
+<td>válaszkód</td>
+</tr>
+<tr class="even">
+<td><code>AMT-1</code></td>
+<td>összeg (a deviza legkisebb egységében: fillér, cent)</td>
+</tr>
+<tr class="odd">
+<td><code>RESPONDER</code></td>
+<td>ki adta a választ (host, BASE24, interchange …)</td>
+</tr>
+<tr class="even">
+<td><code>TERM-ID</code></td>
+<td>terminál azonosító (saját ATM-jeink: <code>ATM…</code>)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="5-a-napváltás">5. A napváltás</h2>
+<p>A BASE24 <strong>üzleti napja nem éjfélkor</strong> kezdődik, hanem
+nálunk <strong>20:30-kor</strong>.</p>
+<ul>
+<li>A <code>PO261102</code> fájl tehát <strong>2026.11.01. 20:30-tól
+2026.11.02. 20:30-ig</strong> tartalmazza a tranzakciókat.</li>
+<li>Egy időpontban <strong>két napló is nyitva van</strong>: az aktuális
+és a következő napi. A terminálok átállása (cutover) nem egyszerre
+történik; amelyik terminál már átállt, annak a tranzakciói már a
+következő napi fájlba íródnak.</li>
+<li>A következő napi fájl <strong>előre létrejön</strong> (ezért lehet a
+<code>FUP INFO</code> „CREATION DATE” mezője napokkal korábbi, mint a
+fájlban lévő adatok).</li>
+<li>A <strong>hálózati elszámolás (settlement)</strong> után az előző
+napi naplót a rendszer lezárja – ekkortól használható riportokra és
+adatkivonatokra.</li>
+</ul>
+<p><strong>Gyakorlati következmények:</strong></p>
+<ul>
+<li>„Mi történt tegnap este 21-kor?” → az a <strong>mai</strong> dátumú
+fájlban van (21:00 &gt; 20:30).</li>
+<li>„Mi történt ma 10-kor?” → szintén a <strong>mai</strong> dátumú
+fájlban (tegnap 20:30 és ma 20:30 között).</li>
+<li>Időszakos lekérdezéseknél figyelni kell, hogy az időablak átnyúlhat
+a napváltáson (két fájl).</li>
+</ul>
+<hr />
+<h2 id="6-hol-vannak-a-fájlok">6. Hol vannak a fájlok?</h2>
+<p>A PTLF egy alkötetben van, a napi fájlok egymás mellett; az
+alternatív kulcs-fájlok más köteteken (pl.
+<code>$SD1</code>–<code>$SD4</code>), azonos alkötetnévvel. Példa:</p>
+<pre><code>FILEINFO $SD5.PRO1PTLF.PO*            == a napi PTLF-ek listája
+FUP INFO $SD5.PRO1PTLF.PO261102, DETAIL</code></pre>
+<p>A <code>FUP INFO … DETAIL</code> kimenetében látszik a típus
+(<code>TYPE E</code>), a formátum (<code>FORMAT 2</code>), a rekord- és
+blokkméret, az alternatív kulcsok és kulcsfájlok, a méret
+(<code>EOF</code>) és az időpontok.</p>
+<p>A TLF hasonló felépítésű alkötetben van; a pontos helyeket a mentorod
+mutatja meg.</p>
+<hr />
+<h2 id="7-ems--az-eseménynapló">7. EMS – az eseménynapló</h2>
+<p>A NonStop és a BASE24 eseményeit (hibák, figyelmeztetések,
+állapotváltozások) az <strong>EMS</strong> (Event Management Service)
+gyűjti.</p>
+<ul>
+<li>Az eseményeket egy <strong>collector</strong> processz (nálunk
+<code>$PCOLL</code>) gyűjti, és <strong>log fájlokba</strong> írja
+(<code>ZZEVnnnn</code>, 843-as fájlkód). Ezek binárisak – közvetlenül
+nem olvashatók.</li>
+<li>Szöveggé az <strong>EMSDIST</strong> alakítja. Egy időszak eseményei
+a terminálra:</li>
+</ul>
+<pre><code>EMSDIST TYPE PRINTING, COLLECTOR $PCOLL, TEXTOUT [#MYTERM], &amp;
+  TIME 2026-11-15 09:00:00, STOP 2026-11-15 09:10:00</code></pre>
+<p>A <code>STOP</code> időpontnál az EMSDIST magától leáll.</p>
+<p>Egy esemény így néz ki:</p>
+<pre><code>26-11-15 09:00:16 \EH08.$P1XML       *ACI.1572.1000        000075 Mgr PPD:
+                                       TSEC: Hardware Security Module error,
+                                       device = SECDEV1, response message = HSM
+                                       Device Hardware Error</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th>Rész</th>
+<th>Jelentés</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>dátum, idő</td>
+<td>mikor</td>
+</tr>
+<tr class="even">
+<td><code>\EH08.$P1XML</code></td>
+<td>melyik processz küldte</td>
+</tr>
+<tr class="odd">
+<td><code>*</code></td>
+<td><strong>kritikus</strong> (kiemelt) esemény</td>
+</tr>
+<tr class="even">
+<td><code>ACI.1572.1000</code></td>
+<td>alrendszer (itt BASE24)</td>
+</tr>
+<tr class="odd">
+<td><code>000075</code></td>
+<td>eseményszám</td>
+</tr>
+<tr class="even">
+<td>szöveg</td>
+<td>a hiba leírása</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="8-hálózat-clim-és-kapcsolatok">8. Hálózat: CLIM és
+kapcsolatok</h2>
+<p>A NonStop X rendszeren a TCP/IP-forgalmat a <strong>CLIM</strong>-ek
+(Linux alapú hálózati egységek) kezelik. A BASE24 kapcsolatai a
+CLIM-eken, <strong>hálózati névterekben</strong> (namespace)
+láthatók:</p>
+<pre><code>climcmd &lt;clim&gt; ip netns list                          == a névterek listája
+climcmd &lt;clim&gt; ip netns exec &lt;névtér&gt; ss -tin dport = :7000 or sport = :7000</code></pre>
+<p>A második parancs egy port összes kapcsolatát mutatja: túloldali cím,
+sorban álló adat (<code>Send-Q</code>), válaszidő (<code>rtt</code>),
+forgalmi számlálók.</p>
+<p>Tipikus portok nálunk: <strong>4275</strong> – ATM-koncentrátorok,
+<strong>7000</strong> – HSM.</p>
+<blockquote>
+<p>A <code>climcmd</code> használata jogosultsághoz kötött; kezdetben a
+mentoroddal együtt használd.</p>
+</blockquote>
+<hr />
+<h2 id="9-gyakorló-kérdések">9. Gyakorló kérdések</h2>
+<p><em>Csak olvasó parancsokkal! A válaszokat a mentoroddal beszéld
+meg.</em></p>
+<ol type="1">
+<li>Mi a tegnapi üzleti nap PTLF fájljának neve? Mettől meddig tartalmaz
+tranzakciókat?</li>
+<li>Kérd le a <code>FUP INFO … DETAIL</code> adatait. Mekkora a fájl
+(<code>EOF</code>), milyen típusú és formátumú, mekkora a blokkméret?
+Mikor jött létre, és mikor módosult utoljára? Miért tér el a kettő?</li>
+<li>Hány alternatív kulcsa van? Mire valók, és melyik köteteken vannak a
+kulcsfájlok?</li>
+<li>Egy ügyfél azt mondja, tegnap este 21:15-kor nem sikerült fizetnie.
+Melyik napi PTLF-ben keresnéd a tranzakciót?</li>
+<li>Mi a különbség a 0210 és a 0420 üzenet között?</li>
+<li>Mit jelent, ha egy ATM-tranzakció válaszkódja 151?</li>
+<li>Mi a STIP, és mikor lép működésbe?</li>
+<li>Kérdezd le az EMS-ből egy 10 perces időszak eseményeit. Melyik
+kritikus? Melyik processz küldte?</li>
+<li>Melyik porton kapcsolódnak az ATM-ek, és melyiken a HSM-ek? Mit
+mutat a <code>Send-Q</code>, ha nem nulla?</li>
+<li>Miért tilos a PTLF-re <code>FUP COPY</code>-t futtatni?</li>
+</ol>
+<h3 id="megoldások-röviden">Megoldások (röviden)</h3>
+<ol type="1">
+<li>A tegnapi dátumú <code>POyymmdd</code>: tegnapelőtt 20:30-tól tegnap
+20:30-ig.</li>
+<li>Pl. ~3 GB, <code>TYPE E</code>, <code>FORMAT 2</code>,
+<code>BLOCK 4096</code>. A fájl a napváltás előtt napokkal jön létre (a
+következő napi fájl előre elkészül), adat csak az üzleti napon kerül
+bele.</li>
+<li>Öt: <code>CR</code> (kártya), <code>RT</code> (kereskedő),
+<code>TT</code>, <code>TK</code> (terminál + idő), <code>RK</code>; az
+<code>ALTFILE</code> sorok mutatják, melyik köteten vannak.</li>
+<li>A <strong>mai</strong> dátumú fájlban – a 21:15 már a következő
+üzleti naphoz tartozik.</li>
+<li>0210: válasz egy engedélyezési kérésre; 0420: sztornó, egy korábbi
+tranzakció visszavonása.</li>
+<li>Az ATM elnyelte a kártyát (első jegy 1), oka: lejárt kártya
+(51).</li>
+<li>Helyettesítő engedélyezés: ha a host nem érhető el, a BASE24 előre
+beállított szabályok szerint dönt.</li>
+<li>A <code>*</code> jelű esemény kritikus; a sor elején a processz neve
+áll.</li>
+<li>ATM: 4275, HSM: 7000. A nem nulla <code>Send-Q</code> azt jelenti,
+hogy a túloldal nem nyugtázta az elküldött adatot – lassú vagy nem
+válaszol.</li>
+<li>Kiírná a kártyaszámokat és a Track 2 adatokat –
+PCI-szabálysértés.</li>
+</ol>
+<hr />
+<h2 id="10-szószedet">10. Szószedet</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Fogalom</th>
+<th>Jelentés</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Acquirer / elfogadó</td>
+<td>akinek az eszközén (ATM, POS) a kártyát használják</td>
+</tr>
+<tr class="even">
+<td>Issuer / kibocsátó</td>
+<td>aki a kártyát kiadta</td>
+</tr>
+<tr class="odd">
+<td>Interchange</td>
+<td>kártyahálózat (Visa, Mastercard) és a hozzá kapcsolódó
+BASE24-interfész</td>
+</tr>
+<tr class="even">
+<td>Host</td>
+<td>a bank számlavezető rendszere</td>
+</tr>
+<tr class="odd">
+<td>STIP</td>
+<td>stand-in processing: helyettesítő engedélyezés host-kiesés
+esetén</td>
+</tr>
+<tr class="even">
+<td>HSM</td>
+<td>hardveres biztonsági modul (PIN, kulcsok, kriptográfia)</td>
+</tr>
+<tr class="odd">
+<td>TLF / PTLF</td>
+<td>ATM / POS tranzakciós napló</td>
+</tr>
+<tr class="even">
+<td>Cutover</td>
+<td>a terminál átállása a következő üzleti napra</td>
+</tr>
+<tr class="odd">
+<td>Settlement</td>
+<td>elszámolás; utána a napi napló lezárul</td>
+</tr>
+<tr class="even">
+<td>Reversal / sztornó</td>
+<td>tranzakció visszavonása (0420)</td>
+</tr>
+<tr class="odd">
+<td>CLIM</td>
+<td>NonStop X hálózati egység (Linux), rajta futnak a
+TCP-kapcsolatok</td>
+</tr>
+<tr class="even">
+<td>EMS</td>
+<td>a NonStop eseménynaplózó rendszere</td>
+</tr>
+<tr class="odd">
+<td>DDL</td>
+<td>adatdefiníciós nyelv; a BASE24-fájlok rekordszerkezetét írja le</td>
+</tr>
+<tr class="even">
+<td>PCI DSS</td>
+<td>a kártyaadatok védelmére vonatkozó szabvány</td>
+</tr>
+</tbody>
+</table>
+</body>
+</html>
