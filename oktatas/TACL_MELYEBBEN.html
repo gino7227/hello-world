@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>TACL m��lyebben</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">TACL m��lyebben</h1>
+</header>
+<h1
+id="tacl-mélyebben--változók-macro-routine-kiértékelés-hibakezelés">TACL
+mélyebben – változók, MACRO, ROUTINE, kiértékelés, hibakezelés</h1>
+<p><em>Azoknak, akik már írnak TACL makrókat, de szeretnék érteni, mi
+történik a háttérben.</em></p>
+<hr />
+<h2 id="1-az-alapgondolat-a-tacl-ben-minden-változó">1. Az alapgondolat:
+a TACL-ben minden változó</h2>
+<p>A TACL-ben nincs külön „program” és „adat”: <strong>minden
+változó</strong>, és a változóknak <strong>típusa</strong> van. Amikor
+beírsz egy szót a promptba, a TACL megnézi, van-e ilyen nevű változó –
+ha MACRO vagy ROUTINE, végrehajtja; ha nincs, programként próbálja
+futtatni (<code>RUN</code>).</p>
+<table>
+<thead>
+<tr class="header">
+<th>Típus</th>
+<th>Mi van benne</th>
+<th>Mire való</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>TEXT</strong></td>
+<td>szöveg</td>
+<td>adat, beállítás (<code>#SET x 5</code>)</td>
+</tr>
+<tr class="even">
+<td><strong>MACRO</strong></td>
+<td>TACL-szöveg, amelyben <code>%1%</code>-szerű helyek vannak</td>
+<td>egyszerű parancssorozat, „rövidítés”</td>
+</tr>
+<tr class="odd">
+<td><strong>ROUTINE</strong></td>
+<td>TACL-szöveg, saját argumentum-feldolgozással</td>
+<td>igazi „függvény”: ellenőrzött paraméterek, visszatérési érték,
+hibakezelés</td>
+</tr>
+<tr class="even">
+<td><strong>ALIAS</strong></td>
+<td>egy másik parancs neve</td>
+<td>átnevezés, rövidítés (`#DEF ll ALIAS</td>
+</tr>
+<tr class="odd">
+<td><strong>DIRECTORY</strong></td>
+<td>további változók</td>
+<td>névtér (mint egy mappa)</td>
+</tr>
+<tr class="even">
+<td><strong>STRUCT</strong></td>
+<td>bináris rekordszerkezet</td>
+<td>rendszerhívások paramétereihez</td>
+</tr>
+<tr class="odd">
+<td><strong>DELTA</strong></td>
+<td>#DELTA szerkesztő-parancsok</td>
+<td>szövegfeldolgozás (ritka)</td>
+</tr>
+</tbody>
+</table>
+<p>Egy változó típusát így nézheted meg:
+<code>#VARIABLEINFO /TYPE/ nev</code> (ha a rendszeretek TACL-verziója
+támogatja), vagy egyszerűen: <code>#DEF</code> listázza a saját
+definícióidat a <code>VARIABLES</code> paranccsal.</p>
+<hr />
+<h2 id="2-hogyan-jön-létre-egy-változó">2. Hogyan jön létre egy
+változó?</h2>
+<h3 id="21-közvetlenül">2.1 Közvetlenül</h3>
+<pre><code>#PUSH x                      == új (üres) TEXT változó
+#SET x hello                 == érték
+#DEF koszon MACRO |BODY| #OUTPUT Szia, %1%!</code></pre>
+<h3 id="22-könyvtárfájlból-section--load--ez-a-megszokott-út">2.2
+Könyvtárfájlból (<code>?SECTION</code> + <code>LOAD</code>) – ez a
+megszokott út</h3>
+<p>Egy EDIT fájlban több definíció lehet, mindegyik egy
+<code>?SECTION</code>-nel kezdődik:</p>
+<pre><code>?TACL MACRO
+?SECTION koszon MACRO
+#OUTPUT Szia, %1%!
+
+?SECTION masol ROUTINE
+... (lásd 6. fejezet)</code></pre>
+<p>Betöltés: <code>LOAD /KEEP 1/ $HD1.SAJAT.LIB</code></p>
+<ul>
+<li>A <code>LOAD</code> minden szekcióból egy változót csinál a szekció
+nevével és típusával.</li>
+<li>A <strong><code>/KEEP 1/</code></strong> azt jelenti: ha a változó
+már létezik, csak 1 szintet tartson meg belőle – vagyis az új definíció
+<strong>lecseréli</strong> a régit, nem halmozódik. <code>KEEP</code>
+nélkül minden <code>LOAD</code> újabb szintet tenne a régire.</li>
+<li>A <code>?TACL MACRO</code> sor a fájl elején csak annyit jelent,
+hogy a fájl önállóan is futtatható (a fájl nevét beírva) – könyvtárként
+betöltve nincs szerepe.</li>
+</ul>
+<hr />
+<h2 id="3-változószintek-push-pop-frame-unframe">3. Változószintek:
+<code>#PUSH</code>, <code>#POP</code>, <code>#FRAME</code>,
+<code>#UNFRAME</code></h2>
+<p>Ez a TACL egyik legfontosabb – és legkevésbé ismert –
+tulajdonsága.</p>
+<h3 id="31-szintek">3.1 Szintek</h3>
+<p>Egy változónak <strong>több szintje</strong> lehet, mint egy
+veremnek:</p>
+<pre><code>#PUSH x          == x új szintje (üres)
+#SET x 1
+#PUSH x          == újabb szint
+#SET x 2
+#OUTPUT [x]      == 2   (mindig a legfelső szint látszik)
+#POP x           == a felső szint eldobva
+#OUTPUT [x]      == 1</code></pre>
+<p>A <code>#SET</code> mindig a <strong>legfelső</strong> szintet
+módosítja; a <code>#PUSH</code> újat tesz rá; a <code>#POP</code>
+leveszi.</p>
+<h3 id="32-keret-frame--unframe">3.2 Keret (<code>#FRAME</code> /
+<code>#UNFRAME</code>)</h3>
+<pre><code>?SECTION pelda MACRO
+#FRAME
+#PUSH a b c
+... munka ...
+#UNFRAME</code></pre>
+<ul>
+<li>A <code>#FRAME</code> megjegyzi a pillanatnyi állapotot.</li>
+<li>Az <code>#UNFRAME</code> <strong>minden</strong>
+<code>#PUSH</code>-t visszavon, ami a <code>#FRAME</code> óta történt –
+így a makró „helyi változói” eltűnnek, és nem írnak felül semmit, ami a
+hívónál ugyanilyen néven létezik.</li>
+<li><strong>Szabály:</strong> minden saját makró/rutin
+<code>#FRAME</code> – <code>#PUSH</code> a használt változókra – munka –
+<code>#UNFRAME</code>.</li>
+</ul>
+<h3 id="33-láthatóság-a-hívott-makró-látja-a-hívó-változóit">3.3
+Láthatóság: a hívott makró látja a hívó változóit</h3>
+<p>A TACL-ben <strong>dinamikus</strong> a láthatóság: ha az
+<code>A</code> makró <code>#PUSH</code>-ol egy <code>x</code>-et, és
+meghívja a <code>B</code> makrót, akkor <code>B</code> látja és
+módosíthatja <code>A</code> <code>x</code>-ét.</p>
+<ul>
+<li><strong>Előny:</strong> egy segédmakró (pl. egy „beállítások”
+szekció) közvetlenül beállíthatja a hívó változóit – a
+<code>#SET</code>-ek a hívó szintjeire mennek.</li>
+<li><strong>Veszély:</strong> ha <code>B</code> ugyanolyan nevű változót
+használ <code>#PUSH</code> nélkül, akkor <code>A</code> változóját írja
+felül. Ezért: <strong>amit egy makró csak magának használ, azt
+<code>#PUSH</code>-olja</strong>, és adj egyedi, előtagos neveket
+(<code>napi^ido</code>, <code>gyak^sv</code>) – a <code>^</code>
+megengedett a nevekben.</li>
+</ul>
+<h3 id="34-könyvtárak-directory">3.4 Könyvtárak (DIRECTORY)</h3>
+<p>A változók névterekben (könyvtárakban) élnek, pl.
+<code>:UTILS:TACL</code> alatt vannak a rendszer makrói. A saját
+változóid az alapértelmezett „otthoni” könyvtáradba kerülnek. A legtöbb
+makróíráshoz ezzel nem kell foglalkozni – csak ha két könyvtárban
+ugyanaz a név szerepel.</p>
+<hr />
+<h2 id="4-kiértékelés-a-szögletes-zárójel">4. Kiértékelés: a szögletes
+zárójel</h2>
+<h3 id="41-----számold-ki-és-tedd-a-helyére">4.1 <code>[ … ]</code> =
+„számold ki, és tedd a helyére”</h3>
+<pre><code>#SET x 5
+#OUTPUT x            == kiírja: x
+#OUTPUT [x]          == kiírja: 5
+#OUTPUT [#COMPUTE x * 2]    == 10</code></pre>
+<ul>
+<li><code>[valtozo]</code> – a változó (legfelső szintjének)
+tartalma.</li>
+<li><code>[#fuggveny …]</code> – a beépített függvény eredménye.</li>
+<li><code>[rutin …]</code> – egy ROUTINE eredménye (lásd 6.3).</li>
+<li>A zárójelek egymásba ágyazhatók:
+<code>[#FILEINFO /EOF/ [f]]</code>.</li>
+</ul>
+<h3 id="42-mikor-nem-kell-zárójel">4.2 Mikor nem kell zárójel?</h3>
+<p>A <strong>kifejezésekben</strong> (<code>#IF</code>,
+<code>#COMPUTE</code>, <code>#LOOP |WHILE|</code>) a változónevet
+zárójel nélkül is a tartalmával helyettesíti:</p>
+<pre><code>[#IF x &gt; 3 |THEN| ...]                  == x itt a tartalma
+#SET y [#COMPUTE x + 1]</code></pre>
+<p>Függvényhívás viszont kifejezésben is zárójel:
+<code>[#IF [#EMPTYV x] |THEN| ...]</code>.</p>
+<h3 id="43-eredmény-lenyelése-sink">4.3 Eredmény „lenyelése”:
+<code>SINK</code></h3>
+<p>Ha egy függvény eredményt ad, de nincs rá szükséged, a
+<code>SINK</code> eldobja – különben a TACL parancsként próbálná
+végrehajtani az eredményt:</p>
+<pre><code>SINK [#SETMANY a b , [szoveg]]          == #SETMANY a maradék szöveget adja vissza</code></pre>
+<hr />
+<h2 id="5-macro--szöveghelyettesítés">5. MACRO –
+szöveghelyettesítés</h2>
+<h3 id="51-hogyan-működik">5.1 Hogyan működik</h3>
+<p>A MACRO hívásakor a TACL a makró szövegében
+<strong>kicseréli</strong> a <code>%…%</code> jelöléseket az
+argumentumokra, és az így kapott szöveget hajtja végre – mintha te
+gépelted volna be.</p>
+<table>
+<thead>
+<tr class="header">
+<th>Jelölés</th>
+<th>Jelentés</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>%1%</code>, <code>%2%</code> …</td>
+<td>az 1., 2. … argumentum</td>
+</tr>
+<tr class="even">
+<td><code>%2 TO 4%</code></td>
+<td>a 2–4. argumentum</td>
+</tr>
+<tr class="odd">
+<td><code>%2 TO *%</code></td>
+<td>a 2. és az összes további</td>
+</tr>
+<tr class="even">
+<td><code>%*%</code></td>
+<td>az összes argumentum</td>
+</tr>
+</tbody>
+</table>
+<pre><code>?SECTION fi MACRO
+FILEINFO %1%
+FUP INFO %1%, DETAIL</code></pre>
+<p><code>fi NAPLO</code> → <code>FILEINFO NAPLO</code> és
+<code>FUP INFO NAPLO, DETAIL</code>.</p>
+<h3 id="52-előnyök-és-korlátok">5.2 Előnyök és korlátok</h3>
+<ul>
+<li><strong>Előny:</strong> egyszerű, gyors megírni; ideális
+„parancs-rövidítéshez”.</li>
+<li><strong>Korlát:</strong>
+<ul>
+<li>nincs argumentum-ellenőrzés: ha hiányzik egy argumentum, a
+<code>%1%</code> helyére üres szöveg kerül, és a parancs furcsa hibát
+ad;</li>
+<li>a helyettesítés <strong>szövegszintű</strong>: a <code>%1%</code> a
+megjegyzésben és az idézőjelek között is kicserélődik;</li>
+<li>az argumentumokat a vessző és a szóköz választja el – vesszőt
+tartalmazó szöveget nem lehet egy argumentumként átadni;</li>
+<li>nincs igazi visszatérési érték és hibakezelés.</li>
+</ul></li>
+</ul>
+<h3 id="53-hiányzó-argumentum-kezelése">5.3 Hiányzó argumentum
+kezelése</h3>
+<pre><code>#SET p %1%
+[#IF [#EMPTYV p] |THEN| #OUTPUT Hasznalat: fi fajlnev |ELSE| FILEINFO [p]]</code></pre>
+<hr />
+<h2 id="6-routine--igazi-eljárás">6. ROUTINE – „igazi” eljárás</h2>
+<h3 id="61-argumentumok-argument">6.1 Argumentumok:
+<code>#ARGUMENT</code></h3>
+<p>A ROUTINE nem <code>%1%</code>-et használ, hanem
+<strong>feldolgozza</strong> az argumentumokat, típus szerint
+ellenőrizve:</p>
+<pre><code>?SECTION masol ROUTINE
+#FRAME
+#PUSH forras cel
+SINK [#ARGUMENT /VALUE forras/ FILENAME]
+SINK [#ARGUMENT /VALUE cel/ FILENAME]
+SINK [#ARGUMENT END]
+FUP DUP [forras], [cel]
+#UNFRAME</code></pre>
+<ul>
+<li><code>#ARGUMENT /VALUE v/ &lt;típus&gt;</code> – a következő
+argumentumot ellenőrzi, és a <code>v</code> változóba teszi.</li>
+<li>Típusok például: <code>FILENAME</code>, <code>NUMBER</code>,
+<code>KEYWORD /WORDLIST …/</code>, <code>TEXT</code>,
+<code>STRING</code>, <code>END</code> (nincs több argumentum).</li>
+<li>Több lehetőség is megadható; az eredmény a megfelelő lehetőség
+sorszáma:
+<pre><code>[#CASE [#ARGUMENT /VALUE v/ NUMBER KEYWORD /WORDLIST ALL/ END]
+ |1| == szamot kaptunk
+ |2| == ALL kulcsszo
+ |3| == nincs argumentum
+]</code></pre></li>
+<li>Ha az argumentum nem felel meg, a TACL <strong>hibát jelez</strong>
+(„Expecting …”), és a rutin nem fut tovább – nem kell kézzel
+ellenőrizni.</li>
+<li><code>[#MORE]</code> – van-e még argumentum; <code>[#REST]</code> –
+a maradék argumentumok szövegként.</li>
+</ul>
+<h3 id="62-visszatérés-return">6.2 Visszatérés:
+<code>#RETURN</code></h3>
+<pre><code>[#IF [#EMPTYV forras] |THEN| #OUTPUT Nincs forras; #RETURN]</code></pre>
+<p>A <code>#RETURN</code> azonnal kilép a rutinból.</p>
+<h3 id="63-visszatérési-érték-result">6.3 Visszatérési érték:
+<code>#RESULT</code></h3>
+<p>A rutin <strong>függvényként</strong> is hívható zárójelben, és amit
+<code>#RESULT</code>-tal ad, az lesz az értéke:</p>
+<pre><code>?SECTION fajlmeret ROUTINE
+#FRAME
+#PUSH f
+SINK [#ARGUMENT /VALUE f/ FILENAME]
+SINK [#ARGUMENT END]
+#RESULT [#FILEINFO /EOF/ [f]]
+#UNFRAME</code></pre>
+<p>Használat:
+<code>#OUTPUT A NAPLO merete: [fajlmeret NAPLO] bajt</code></p>
+<h3 id="64-macro-vagy-routine">6.4 MACRO vagy ROUTINE?</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Szempont</th>
+<th>MACRO</th>
+<th>ROUTINE</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Argumentumok</td>
+<td><code>%1%</code> szöveghelyettesítés</td>
+<td><code>#ARGUMENT</code>, típus-ellenőrzéssel</td>
+</tr>
+<tr class="even">
+<td>Hiányzó / rossz argumentum</td>
+<td>csendben rossz parancs lesz belőle</td>
+<td>azonnali, érthető hibaüzenet</td>
+</tr>
+<tr class="odd">
+<td>Visszatérési érték</td>
+<td>nincs igazán</td>
+<td><code>#RESULT</code>, függvényként hívható</td>
+</tr>
+<tr class="even">
+<td>Korai kilépés</td>
+<td>körülményes (`#IF …</td>
+<td>ELSE</td>
+</tr>
+<tr class="odd">
+<td>Hibakezelés</td>
+<td>korlátozott</td>
+<td><code>#FILTER</code> / <code>#EXCEPTION</code> (7. fejezet)</td>
+</tr>
+<tr class="even">
+<td>Megírás</td>
+<td>gyors, egyszerű</td>
+<td>kicsit több „szertartás”</td>
+</tr>
+<tr class="odd">
+<td><strong>Mikor</strong></td>
+<td>rövidítés, egyszerű parancssor, saját használat</td>
+<td>mások által is használt eszköz, paraméterezett, hibatűrő logika</td>
+</tr>
+</tbody>
+</table>
+<p>Ökölszabály: ha a makróban már <code>#IF [#EMPTYV …]</code>
+ellenőrzésekkel vadászod a hiányzó argumentumokat, vagy egy értéket
+akarsz visszaadni, <strong>írd át ROUTINE-ra</strong>.</p>
+<hr />
+<h2 id="7-vezérlés">7. Vezérlés</h2>
+<pre><code>[#IF feltetel |THEN|
+  ... 
+|ELSE|
+  ...
+]
+
+[#CASE [valtozo]
+ |A|      ...
+ |B C|    ...                 == B vagy C
+ |OTHERWISE| ...
+]
+
+[#LOOP |WHILE| i &lt; 10 |DO|
+  ...
+  #SET i [#COMPUTE i + 1]
+]
+
+[#LOOP |DO| ... |UNTIL| feltetel]</code></pre>
+<ul>
+<li>A <code>|THEN|</code>, <code>|ELSE|</code>, <code>|DO|</code> stb.
+<strong>címkék</strong> – a blokk a következő címkéig, illetve a záró
+<code>]</code>-ig tart.</li>
+<li>Az <code>#IF</code> feltétele számként értelmeződik: <strong>0 =
+hamis, minden más igaz</strong>. Sok függvény -1-et ad igaznak (pl.
+<code>#FILEINFO /EXISTENCE/</code>, <code>#EMPTYV</code>).</li>
+</ul>
+<hr />
+<h2 id="8-kifejezések-és-összehasonlítás">8. Kifejezések és
+összehasonlítás</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Fajta</th>
+<th>Operátorok</th>
+<th>Példa</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>szám</td>
+<td><code>=  &lt;&gt;  &lt;  &gt;  &lt;=  &gt;=</code></td>
+<td>`[#IF n &gt; 10</td>
+</tr>
+<tr class="even">
+<td>szöveg</td>
+<td><code>'='  '&lt;&gt;'  '&lt;'  '&gt;'</code> (aposztróffal!)</td>
+<td>`[#IF valasz '=' "IGEN"</td>
+</tr>
+<tr class="odd">
+<td>logikai</td>
+<td><code>AND  OR  NOT</code></td>
+<td>`[#IF NOT [#EMPTYV x] AND n &gt; 0</td>
+</tr>
+<tr class="even">
+<td>aritmetika</td>
+<td><code>+  -  *  /</code></td>
+<td><code>[#COMPUTE (a + b) * 2]</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Csapda:</strong> szöveget <code>=</code>-vel összehasonlítva
+a TACL számként próbálja értelmezni – szövegre mindig <code>'='</code>
+kell.</p>
+<hr />
+<h2 id="9-hibakezelés-filter-exception-raise">9. Hibakezelés:
+<code>#FILTER</code>, <code>#EXCEPTION</code>, <code>#RAISE</code></h2>
+<p>Egy ROUTINE „elkaphatja” a benne keletkező hibát:</p>
+<pre><code>?SECTION biztos ROUTINE
+#FRAME
+#FILTER _ERROR
+[#CASE [#EXCEPTION]
+ |_ERROR|
+   #OUTPUT Hiba tortent: [#ERRORNUMBERS]
+   #UNFRAME
+   #RETURN
+ |OTHERWISE|
+]
+== --- normal futas ---
+FUP DUP NINCSILYEN, VALAMI
+#OUTPUT Kesz.
+#UNFRAME</code></pre>
+<ul>
+<li><code>#FILTER _ERROR</code> – a rutin jelzi, hogy a
+<code>_ERROR</code> kivételt maga kezeli.</li>
+<li>Kivétel esetén a TACL a rutint <strong>az elejétől
+újraindítja</strong>, és ekkor a <code>[#EXCEPTION]</code> a kivétel
+nevét adja (normál indításkor üres). Ezért van a kezelő a rutin
+elején.</li>
+<li><code>[#ERRORNUMBERS]</code> – a hiba részletei (hibaszámok).</li>
+<li><code>#RAISE _ERROR</code> – saját kivétel kiváltása.</li>
+<li>További kivételek: <code>_BREAK</code> (a felhasználó BREAK-et
+nyomott), <code>_CALLERS_ERROR</code> (a hívó oldalán jelzett
+hiba).</li>
+</ul>
+<blockquote>
+<p>A pontos viselkedés TACL-verziónként kicsit eltérhet – egy új
+hibakezelő rutint mindig próbálj ki egy szándékosan hibás
+paranccsal.</p>
+</blockquote>
+<hr />
+<h2 id="10-programok-futtatása-makróból">10. Programok futtatása
+makróból</h2>
+<pre><code>RUN prog /NAME $X, NOWAIT, OUT $S.#LISTA, CPU 2/ param1 param2
+prog /OUTV valt/ param1          == a kimenet egy TACL-változóba
+prog /INV valt/ param1           == a bemenet (IN) egy TACL-változóból</code></pre>
+<ul>
+<li><strong><code>/OUTV v/</code></strong>: a program kimenete a
+<code>v</code> változóba kerül (soronként) – utána
+<code>#LINECOUNT</code>, <code>#LINEGET</code>,
+<code>#CHARFIND</code>-dal feldolgozható.</li>
+<li><strong><code>/INV v/</code></strong>: a program a <code>v</code>
+változó sorait olvassa bemenetként.</li>
+<li><strong>Nem minden program támogatja</strong>: amelyik az OUT-ját
+fájlként kezeli, az hibát ad (pl. a <code>climcmd</code>: „Filename must
+be specified with OUT run-option”). Ilyenkor: kimenet egy munkafájlba
+(<code>/OUT fajl/</code>), majd
+<code>FUP /OUTV v/ COPY fajl</code>.</li>
+<li><strong>A <code>FUP COPY</code> a hosszú rekordokat
+levághatja</strong>, ha változóba ír – nagyon hosszú sorokat inkább egy
+programmal érdemes közvetlenül a fájlból olvasni.</li>
+<li>A TACL <strong>beépített parancsai</strong> (pl.
+<code>FILEINFO</code>, <code>STATUS</code>) nem programok, ezért
+<code>/OUT …/</code> opciót nem kapnak – helyettük a megfelelő program
+(pl. <code>FUP INFO</code>) vagy függvény (<code>#FILEINFO</code>)
+használható.</li>
+</ul>
+<hr />
+<h2 id="11-hasznos-beépített-függvények">11. Hasznos beépített
+függvények</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Függvény</th>
+<th>Mit ad</th>
+<th>Példa</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>#OUTPUT</code> / <code>#OUTPUTV</code></td>
+<td>kiír szöveget / egy változó tartalmát</td>
+<td><code>#OUTPUTV lista</code></td>
+</tr>
+<tr class="even">
+<td><code>#EMPTYV v</code></td>
+<td>üres-e a változó (-1 / 0)</td>
+<td><code>[#IF [#EMPTYV v] …]</code></td>
+</tr>
+<tr class="odd">
+<td><code>#COMPUTE</code></td>
+<td>aritmetika</td>
+<td><code>[#COMPUTE x * 60]</code></td>
+</tr>
+<tr class="even">
+<td><code>#CHARFIND v poz szöveg</code></td>
+<td>szöveg helye a változóban (0 = nincs)</td>
+<td><code>[#CHARFIND v 1 ERROR]</code></td>
+</tr>
+<tr class="odd">
+<td><code>#CHARGET v a TO b</code></td>
+<td>részszöveg</td>
+<td><code>[#CHARGET d 6 TO 7]</code></td>
+</tr>
+<tr class="even">
+<td><code>#CHARCOUNT v</code></td>
+<td>hossz</td>
+<td></td>
+</tr>
+<tr class="odd">
+<td><code>#SHIFTSTRING /UP/</code></td>
+<td>nagybetűsítés</td>
+<td><code>[#SHIFTSTRING /UP/ [x]]</code></td>
+</tr>
+<tr class="even">
+<td><code>#SETMANY a b , szöveg</code></td>
+<td>szavak szétosztása változókba; a maradékot adja vissza</td>
+<td><code>SINK [#SETMANY h m , [ido]]</code></td>
+</tr>
+<tr class="odd">
+<td><code>#APPEND v szöveg</code> / <code>#APPENDV v w</code></td>
+<td>sor hozzáfűzése / változó hozzáfűzése</td>
+<td></td>
+</tr>
+<tr class="even">
+<td><code>#LINECOUNT v</code> / <code>#LINEGET v n</code></td>
+<td>sorok száma / n. sor</td>
+<td></td>
+</tr>
+<tr class="odd">
+<td><code>#FILEINFO /opció/ fájl</code></td>
+<td><code>EXISTENCE</code>, <code>CODE</code>, <code>EOF</code>,
+<code>SECURITY</code> …</td>
+<td><code>[#FILEINFO /EXISTENCE/ [f]]</code></td>
+</tr>
+<tr class="even">
+<td><code>#FILENAMES minta</code></td>
+<td>a mintára illeszkedő fájlnevek</td>
+<td><code>[#FILENAMES $HD1.GYAK.*]</code></td>
+</tr>
+<tr class="odd">
+<td><code>#DELAY n</code></td>
+<td>várakozás <strong>századmásodpercben</strong></td>
+<td><code>#DELAY 30000</code> = 5 perc</td>
+</tr>
+<tr class="even">
+<td><code>#TIMESTAMP</code> + <code>#CONTIME</code></td>
+<td>helyi idő: <code>év hó nap óra perc mp szmp</code></td>
+<td><code>[#CONTIME [#TIMESTAMP]]</code></td>
+</tr>
+<tr class="odd">
+<td><code>#JULIANTIMESTAMP</code> +
+<code>#INTERPRETTIMESTAMP</code></td>
+<td>64 bites időbélyeg és felbontása</td>
+<td></td>
+</tr>
+<tr class="even">
+<td><code>#DEFAULTS</code></td>
+<td>alapértelmezett kötet/alkötet</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="12-szintaxis-apróságok">12. Szintaxis-apróságok</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Jel</th>
+<th>Jelentés</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>==</code></td>
+<td>megjegyzés a sor végéig</td>
+</tr>
+<tr class="even">
+<td><code>{ … }</code></td>
+<td>megjegyzés (több sor is lehet)</td>
+</tr>
+<tr class="odd">
+<td><code>&amp;</code> a sor végén</td>
+<td>a parancs a következő sorban folytatódik</td>
+</tr>
+<tr class="even">
+<td>`</td>
+<td>…</td>
+</tr>
+<tr class="odd">
+<td><code>^</code></td>
+<td>megengedett karakter változónévben (<code>napi^ido</code>) – jó
+előtagokhoz</td>
+</tr>
+<tr class="even">
+<td><code>!</code> (pl. <code>FUP PURGE x!</code>)</td>
+<td>megerősítés nélkül – óvatosan!</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="13-gyakori-csapdák">13. Gyakori csapdák</h2>
+<ol type="1">
+<li><strong><code>#PUSH</code> nélküli változó</strong> – felülírja a
+hívó ugyanilyen nevű változóját, vagy hibát ad, ha nem létezik. Mindig
+<code>#FRAME</code> / <code>#PUSH</code> / <code>#UNFRAME</code>.</li>
+<li><strong>Függvényeredmény nincs elnyelve</strong> –
+<code>#SETMANY</code>, <code>#ARGUMENT</code> és társai eredményét
+<code>SINK</code>-kel dobd el, különben a TACL parancsként
+futtatja.</li>
+<li><strong>Szöveg-összehasonlítás <code>=</code>-vel</strong> –
+szövegre <code>'='</code>.</li>
+<li><strong><code>#DELAY</code> másodperc helyett
+századmásodperc</strong> – <code>#DELAY 60</code> csak 0,6 mp.</li>
+<li><strong><code>LOAD</code> <code>/KEEP 1/</code> nélkül</strong> – a
+definíciók halmozódnak, és nem mindig a legújabb fut.</li>
+<li><strong>Makró-argumentumban vessző</strong> – a vessző elválasztó;
+ilyenkor ROUTINE és <code>#REST</code>, vagy a vesszőt tartalmazó
+parancsot írd be magába a makróba.</li>
+<li><strong><code>/OUTV/</code> nem működik egy programmal</strong> –
+munkafájl + <code>FUP COPY</code>.</li>
+<li><strong>A <code>%1%</code> a megjegyzésben is kicserélődik</strong>
+– ne írj <code>%…%</code>-ot a makró megjegyzéseibe, ha nem
+helyettesítésnek szánod.</li>
+</ol>
+<hr />
+<h2 id="14-ugyanaz-macro-ként-és-routine-ként">14. Ugyanaz MACRO-ként és
+ROUTINE-ként</h2>
+<p>Feladat: egy fájl méretének kiírása; ha nincs ilyen fájl, érthető
+üzenet.</p>
+<p><strong>MACRO:</strong></p>
+<pre><code>?SECTION meret MACRO
+#FRAME
+#PUSH f
+#SET f %1%
+[#IF [#EMPTYV f] |THEN|
+  #OUTPUT Hasznalat: meret fajlnev
+|ELSE|
+  [#IF [#FILEINFO /EXISTENCE/ [f]] |THEN|
+    #OUTPUT [f]: [#FILEINFO /EOF/ [f]] bajt
+  |ELSE|
+    #OUTPUT Nincs ilyen fajl: [f]
+  ]
+]
+#UNFRAME</code></pre>
+<p><strong>ROUTINE:</strong></p>
+<pre><code>?SECTION meret ROUTINE
+#FRAME
+#PUSH f
+SINK [#ARGUMENT /VALUE f/ FILENAME]      == hianyzo/hibas nev: automatikus hiba
+SINK [#ARGUMENT END]
+[#IF NOT [#FILEINFO /EXISTENCE/ [f]] |THEN|
+  #OUTPUT Nincs ilyen fajl: [f]
+  #UNFRAME
+  #RETURN
+]
+#OUTPUT [f]: [#FILEINFO /EOF/ [f]] bajt
+#UNFRAME</code></pre>
+<p>A ROUTINE-ban nincs szükség a „Hasznalat” ágra – a
+<code>#ARGUMENT</code> maga jelez, ha hiányzik vagy rossz a fájlnév –,
+és a <code>#RETURN</code> miatt nem kell egymásba ágyazni az
+<code>#IF</code>-eket.</p>
+<hr />
+<p><em>Megjegyzés: a TACL-verziók között apró eltérések lehetnek. Ha egy
+függvény vagy opció nálatok másképp viselkedik, a „TACL Reference
+Manual” az irányadó; új szerkezetet először mindig a homokozóban próbálj
+ki.</em></p>
+</body>
+</html>
