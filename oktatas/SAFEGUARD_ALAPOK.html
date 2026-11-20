@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Safeguard ��� kezd��knek</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">Safeguard ��� kezd��knek</h1>
+</header>
+<h1 id="safeguard--kezdőknek">Safeguard – kezdőknek</h1>
+<p><em>Kik vagyunk a rendszer szemében, ki mit érhet el, és mit tegyél,
+ha „Security violation” hibát kapsz.</em></p>
+<hr />
+<h2 id="0-biztonsági-szabályok-ezzel-kezdünk">0. Biztonsági szabályok
+(ezzel kezdünk)</h2>
+<ol type="1">
+<li><strong>A felhasználói azonosítód személyes.</strong> A jelszavadat
+ne add tovább, és ne dolgozz más nevében.</li>
+<li><strong>Kezdőként a Safeguardban csak nézelődsz.</strong> Az
+<code>INFO</code> parancsok ártalmatlanok. Az <code>ADD</code>,
+<code>ALTER</code>, <code>DELETE</code>, <code>FREEZE</code>,
+<code>THAW</code> parancsokat nem használod: ezek a biztonsági
+adminisztrátor dolgai.</li>
+<li><strong>Ha egy fájlhoz nincs jogod, ne kerülgesd.</strong> Ne másold
+át, ne próbálkozz más azonosítóval. Szólj a mentorodnak; ha valóban kell
+a jog, a biztonsági adminisztrátor adja meg.</li>
+<li><strong>A prod rendszeren (\EH08) minden hozzáférés
+naplózódhat.</strong> A sikertelen próbálkozások is.</li>
+</ol>
+<hr />
+<h2 id="1-mi-a-safeguard">1. Mi a Safeguard?</h2>
+<p>A NonStop gépeknek két biztonsági rétegük van:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Réteg</th>
+<th>Mit tud</th>
+<th>Hol látod</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Guardian-biztonság</strong> (alap)</td>
+<td>fájlonként 4 betű: ki olvashat, írhat, futtathat, törölhet
+(RWEP)</td>
+<td><code>FILEINFO</code>, <code>FUP INFO</code></td>
+</tr>
+<tr class="even">
+<td><strong>Safeguard</strong> (kiegészítő termék)</td>
+<td>felhasználók és jelszavak kezelése, részletes hozzáférési listák
+(ACL), naplózás</td>
+<td><code>SAFECOM</code></td>
+</tr>
+</tbody>
+</table>
+<p>A Safeguard <strong>a Guardian fölé épül</strong>. Ha egy fájlra,
+alkötetre vagy kötetre Safeguard-védelem van beállítva, a hozzáférésről
+a Safeguard dönt, a Guardian-féle RWEP-betűk helyett.</p>
+<p>A Safeguard ezen felül:</p>
+<ul>
+<li>kezeli a <strong>bejelentkezést</strong> (felhasználónév, jelszó,
+jelszólejárat, zárolás hibás próbálkozások után);</li>
+<li><strong>naplózza</strong> a hozzáféréseket (auditálás), ha be van
+állítva;</li>
+<li>védheti a processzeket és az eszközöket (terminálok, nyomtatók)
+is.</li>
+</ul>
+<hr />
+<h2 id="2-felhasználók-csoport-és-felhasználó">2. Felhasználók: csoport
+és felhasználó</h2>
+<p>Minden felhasználónak két alakja van:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Alak</th>
+<th>Példa</th>
+<th>Jelentés</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>név</strong></td>
+<td><code>GRP.USER</code></td>
+<td>csoportnév, pont, felhasználónév</td>
+</tr>
+<tr class="even">
+<td><strong>szám</strong></td>
+<td><code>8,3</code></td>
+<td>csoportszám, vessző, felhasználószám</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>A <strong>csoport</strong> (group) a csapat, például az üzemeltetők.
+A csoport tagjai jellemzően hozzáférnek egymás fájljaihoz.</li>
+<li>A <strong>felhasználó</strong> egy személy vagy egy technikai
+azonosító (például a BASE24 alkalmazás futtatója).</li>
+<li><strong><code>n,255</code></strong>: a csoport
+<strong>menedzsere</strong>, aki a csoportja felhasználóit
+kezelheti.</li>
+<li><strong><code>255,255</code></strong> a
+<strong>SUPER.SUPER</strong>: a rendszer legerősebb azonosítója.
+Kezdőként nem használod.</li>
+</ul>
+<h3 id="alias">Alias</h3>
+<p>Egy felhasználónak lehet <strong>aliasa</strong>: egy másik,
+kényelmesebb bejelentkezési név (például a saját neved), amely mögött
+ugyanaz a <code>csoport,felhasználó</code> szám áll. Ha bejelentkezéskor
+egy rövid nevet írsz be, és nem <code>CSOPORT.NÉV</code>-et, az
+valószínűleg alias.</p>
+<h3 id="ki-vagyok">Ki vagyok?</h3>
+<pre><code>WHO                 == a bejelentkezett felhasználó, a default alkötet, a gép</code></pre>
+<p>A <code>WHO</code> megmutatja a felhasználóneved és a számát is.
+Érdemes megjegyezni, mert a jogosultsági listákban gyakran számként
+szerepel (<code>8,3</code>).</p>
+<hr />
+<h2 id="3-bejelentkezés-jelszó">3. Bejelentkezés, jelszó</h2>
+<pre><code>LOGON GRP.USER        == bejelentkezés (vagy az aliasoddal)
+LOGOFF                == kijelentkezés
+PASSWORD              == jelszócsere (a rendszer kéri a régit és az újat)</code></pre>
+<ul>
+<li>A jelszónak <strong>lejárata</strong> lehet. Ha lejár,
+bejelentkezéskor új jelszót kér.</li>
+<li>Több hibás próbálkozás után a felhasználó
+<strong>zárolódhat</strong> (FROZEN). Ilyenkor csak a biztonsági
+adminisztrátor tudja feloldani (THAW). Ha ez történik, ne próbálkozz
+tovább: szólj.</li>
+<li>A terminált ne hagyd bejelentkezve, amikor felállsz.</li>
+</ul>
+<hr />
+<h2 id="4-guardian-biztonság-röviden-rwep">4. Guardian-biztonság röviden
+(RWEP)</h2>
+<p>Ezt az 1. cikkben már láttad, itt csak emlékeztetőül. Minden fájlnak
+négy betűje van, ebben a sorrendben:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Pozíció</th>
+<th>Jog</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>R</td>
+<td>olvasás (Read)</td>
+</tr>
+<tr class="even">
+<td>W</td>
+<td>írás (Write)</td>
+</tr>
+<tr class="odd">
+<td>E</td>
+<td>futtatás (Execute)</td>
+</tr>
+<tr class="even">
+<td>P</td>
+<td>törlés (Purge)</td>
+</tr>
+</tbody>
+</table>
+<p>A betűk értéke azt mondja meg, <strong>ki</strong> kapja az adott
+jogot:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Betű</th>
+<th>Ki</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>O</code></td>
+<td>csak a tulajdonos (Owner)</td>
+</tr>
+<tr class="even">
+<td><code>G</code></td>
+<td>a tulajdonos csoportja (Group)</td>
+</tr>
+<tr class="odd">
+<td><code>A</code></td>
+<td>bárki ezen a gépen (All)</td>
+</tr>
+<tr class="even">
+<td><code>C</code></td>
+<td>a tulajdonos csoportja a hálózatban (más gépről is)</td>
+</tr>
+<tr class="odd">
+<td><code>N</code></td>
+<td>bárki a hálózatban (Network)</td>
+</tr>
+<tr class="even">
+<td><code>U</code></td>
+<td>a tulajdonos a hálózatban (User)</td>
+</tr>
+<tr class="odd">
+<td><code>-</code></td>
+<td>csak a SUPER.SUPER</td>
+</tr>
+</tbody>
+</table>
+<p>Példa: <code>NUNU</code> – mindenki olvashat és futtathat, de írni és
+törölni csak a tulajdonos.</p>
+<p><strong>Ha Safeguard védi a fájlt</strong>, a <code>FUP INFO</code> a
+betűk helyett ezt mutatja: <code>*SG*</code>. Ilyenkor a RWEP-betűk nem
+számítanak; a jogokat a <code>SAFECOM</code> mutatja meg.</p>
+<hr />
+<h2 id="5-safeguard-védelem-mit-lehet-védeni">5. Safeguard-védelem: mit
+lehet védeni?</h2>
+<p>A Safeguard <strong>védelmi rekordokkal</strong> (protection record)
+dolgozik. Egy védelmi rekord egy objektumhoz tartozik:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Objektum</th>
+<th>Példa</th>
+<th>Jelentés</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>VOLUME</strong></td>
+<td><code>$HD1</code></td>
+<td>az egész kötet</td>
+</tr>
+<tr class="even">
+<td><strong>SUBVOLUME</strong></td>
+<td><code>$HD1.GYAK</code></td>
+<td>egy alkötet minden fájlja</td>
+</tr>
+<tr class="odd">
+<td><strong>DISKFILE</strong></td>
+<td><code>$HD1.GYAK.NAPLO</code></td>
+<td>egy fájl (minta is lehet: <code>$HD1.GYAK.*</code>)</td>
+</tr>
+<tr class="even">
+<td><strong>PROCESS</strong></td>
+<td><code>$GY01</code></td>
+<td>egy processznév</td>
+</tr>
+<tr class="odd">
+<td><strong>DEVICE</strong></td>
+<td><code>$S</code>, egy terminál</td>
+<td>egy eszköz</td>
+</tr>
+</tbody>
+</table>
+<p>A rendszer beállításától függ, <strong>melyik szintet nézi</strong> a
+Safeguard (kötet, alkötet, fájl), és melyik az erősebb. Kezdőként elég
+annyit tudni: ha egy fájlnak nincs saját rekordja, a jogok jöhetnek az
+alkötet vagy a kötet rekordjából is.</p>
+<h3 id="a-hozzáférési-lista-acl">A hozzáférési lista (ACL)</h3>
+<p>A védelmi rekord fő része egy lista: <strong>kinek milyen joga
+van</strong>.</p>
+<table>
+<thead>
+<tr class="header">
+<th>Jog</th>
+<th>Jelentés</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>R</code></td>
+<td>olvasás (READ)</td>
+</tr>
+<tr class="even">
+<td><code>W</code></td>
+<td>írás (WRITE)</td>
+</tr>
+<tr class="odd">
+<td><code>E</code></td>
+<td>futtatás (EXECUTE)</td>
+</tr>
+<tr class="even">
+<td><code>P</code></td>
+<td>törlés (PURGE)</td>
+</tr>
+<tr class="odd">
+<td><code>C</code></td>
+<td>létrehozás (CREATE) – kötetnél, alkötetnél: hozhatsz-e létre benne
+fájlt</td>
+</tr>
+<tr class="even">
+<td><code>O</code></td>
+<td>tulajdonosi jog (OWNER) – módosíthatja a védelmi rekordot</td>
+</tr>
+</tbody>
+</table>
+<p>Egy bejegyzés lehet egy felhasználó (<code>8,3</code>), egy egész
+csoport (<code>8,*</code>) vagy mindenki (<code>*,*</code>). Létezik
+<strong>tiltó</strong> bejegyzés is (DENY): az a megengedő bejegyzésnél
+erősebb.</p>
+<hr />
+<h2 id="6-nézelődés-a-safecom">6. Nézelődés: a SAFECOM</h2>
+<p>A <code>SAFECOM</code> a Safeguard parancsértelmezője. Futtatható
+interaktívan vagy egyetlen paranccsal:</p>
+<pre><code>SAFECOM
+=INFO USER GRP.USER                 == egy felhasználó adatai
+=INFO DISKFILE $HD1.GYAK.NAPLO      == egy fájl védelmi rekordja
+=INFO DISKFILE $HD1.GYAK.*          == egy alkötet összes védett fájlja
+=INFO SUBVOLUME $HD1.GYAK           == az alkötet védelme
+=INFO VOLUME $HD1                   == a kötet védelme
+=EXIT</code></pre>
+<p>Egyetlen parancsként is működik:</p>
+<pre><code>SAFECOM INFO USER GRP.USER</code></pre>
+<p>A <code>=</code> a SAFECOM promptja. A <code>HELP</code> parancs a
+SAFECOM-on belül is működik (<code>=HELP INFO</code>).</p>
+<h3 id="mit-látsz-egy-fájlnál-minta-a-pontos-forma-eltérhet">Mit látsz
+egy fájlnál? (minta, a pontos forma eltérhet)</h3>
+<pre><code>$HD1.GYAK
+NAPLO        LAST-MODIFIED     OWNER   STATUS   WARNING-MODE
+             20NOV26, 10:15    8,3     THAWED   OFF
+
+             8,3       R,W,E,P,O
+             8,*       R</code></pre>
+<p>Olvasd így:</p>
+<ul>
+<li><strong>OWNER 8,3</strong>: a rekord tulajdonosa (ő
+módosíthatja).</li>
+<li><strong>STATUS THAWED</strong>: a védelem aktív, a lista szerint
+lehet hozzáférni. FROZEN állapotban senki nem fér hozzá.</li>
+<li><strong>8,3 R,W,E,P,O</strong>: a 8,3-as felhasználó mindent
+tehet.</li>
+<li><strong>8,* R</strong>: a 8-as csoport többi tagja csak
+olvashat.</li>
+</ul>
+<h3 id="mit-látsz-egy-felhasználónál">Mit látsz egy felhasználónál?</h3>
+<p>Jellemző mezők: a felhasználó neve és száma, a
+<strong>STATUS</strong> (THAWED = aktív, FROZEN = zárolt), a jelszó
+lejárata (PASSWORD-EXPIRES), a default kötet/alkötet (DEFAULT-VOLUME),
+és hogy mikor jelentkezett be utoljára.</p>
+<hr />
+<h2 id="7-hibák-amelyekkel-találkozni-fogsz">7. Hibák, amelyekkel
+találkozni fogsz</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Hiba</th>
+<th>Jelentés</th>
+<th>Mit tegyél</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>ERROR 48</strong> – security violation</td>
+<td>nincs jogod a művelethez (olvasás, írás, futtatás, törlés)</td>
+<td>nézd meg a fájl védelmét (<code>FUP INFO</code>, ha
+<code>*SG*</code>: <code>SAFECOM INFO DISKFILE</code>); ha kell a jog,
+szólj</td>
+</tr>
+<tr class="even">
+<td><strong>ERROR 11</strong> – file not found</td>
+<td>nincs ilyen fájl, <strong>vagy</strong> el van rejtve előled</td>
+<td>ellenőrizd a nevet és a default alkötetet</td>
+</tr>
+<tr class="odd">
+<td>bejelentkezési hiba</td>
+<td>rossz jelszó, lejárt jelszó vagy zárolt felhasználó</td>
+<td>ne próbálkozz sokszor; szólj</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tipp:</strong> az ERROR 48 nem hiba a rendszerben, hanem a
+védelem működése. A prod rendszeren gyakran <strong>szándékos</strong>,
+hogy egy üzemeltető ne írhasson egy alkalmazásfájlba.</p>
+<hr />
+<h2 id="8-gyakorlás-eh06">8. Gyakorlás (\EH06)</h2>
+<p>Csak nézelődős feladatok, semmit nem módosítanak.</p>
+<ol type="1">
+<li>Futtasd a <code>WHO</code>-t. Mi a felhasználóneved, és mi a száma
+(<code>csoport,felhasználó</code>)?</li>
+<li>Nézd meg a saját felhasználód adatait:
+<code>SAFECOM INFO USER &lt;neved&gt;</code>. Mikor jár le a
+jelszavad?</li>
+<li>A homokozóban (<code>$HD1.GYAK</code>) futtasd:
+<code>FUP INFO *</code>. Van-e olyan fájl, amelynél <code>*SG*</code>
+áll?</li>
+<li>Futtasd: <code>SAFECOM INFO SUBVOLUME $HD1.GYAK</code> és
+<code>SAFECOM INFO VOLUME $HD1</code>. Van-e védelmi rekord? Ha nincs, a
+SAFECOM ezt jelzi – ez is válasz.</li>
+<li>Keress egy fájlt, amelyhez nincs jogod olvasni (kérj példát a
+mentorodtól), és próbáld meg: <code>FUP COPY &lt;fajl&gt;</code>. Milyen
+hibaszámot kaptál?</li>
+</ol>
+<details>
+<summary>Megoldások</summary>
+
+<ol type="1">
+<li><code>WHO</code> – a kimenetben a „User” vagy „Logged on as” sor
+mutatja a nevet és a számot.</li>
+<li>A <code>PASSWORD-EXPIRES</code> mező mutatja; ha nincs kitöltve,
+nincs lejárat.</li>
+<li>Ha minden fájlnál RWEP-betűk állnak (pl. <code>NUNU</code>), egyiket
+sem védi saját Safeguard-rekord.</li>
+<li>A homokozónak általában nincs saját rekordja; a kötetnek lehet.</li>
+<li>ERROR 48 (security violation). FUP COPY-t csak a mentor által
+mutatott, nem éles fájlon próbálj!</li>
+</ol>
+</details>
+
+<hr />
+<h2 id="9-összefoglaló">9. Összefoglaló</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Kérdés</th>
+<th>Parancs</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Ki vagyok?</td>
+<td><code>WHO</code></td>
+</tr>
+<tr class="even">
+<td>Jelszócsere</td>
+<td><code>PASSWORD</code></td>
+</tr>
+<tr class="odd">
+<td>Milyen a fájl alapvédelme?</td>
+<td><code>FUP INFO fajl</code> vagy <code>FILEINFO fajl</code></td>
+</tr>
+<tr class="even">
+<td>Safeguard védi?</td>
+<td><code>*SG*</code> a <code>FUP INFO</code>-ban</td>
+</tr>
+<tr class="odd">
+<td>Kinek milyen joga van?</td>
+<td><code>SAFECOM INFO DISKFILE fajl</code></td>
+</tr>
+<tr class="even">
+<td>Egy felhasználó adatai</td>
+<td><code>SAFECOM INFO USER név</code></td>
+</tr>
+<tr class="odd">
+<td>„Security violation”</td>
+<td>ERROR 48 – nincs jogod; szólj, ne kerülgesd</td>
+</tr>
+</tbody>
+</table>
+<p><em>Megjegyzés: a Safeguard beállításai (mely szinteket nézi, van-e
+auditálás, a jelszószabályok) rendszerenként eltérnek. A pontos kimeneti
+formát és a nálunk érvényes szabályokat a mentorod vagy a biztonsági
+adminisztrátor tudja megmutatni.</em></p>
+</body>
+</html>
